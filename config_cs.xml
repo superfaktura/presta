@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<module>
+	<name>superfaktura</name>
+	<displayName><![CDATA[SuperFaktura]]></displayName>
+	<version><![CDATA[1.6]]></version>
+	<description><![CDATA[Prepojenie PrestaShop 1.5.x s www.superfaktura.sk.]]></description>
+	<author><![CDATA[www.superfaktura.sk]]></author>
+	<tab><![CDATA[billing_invoicing]]></tab>
+	<is_configurable>1</is_configurable>
+	<need_instance>1</need_instance>
+	<limited_countries></limited_countries>
+</module>
