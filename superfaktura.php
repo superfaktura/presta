@@ -5,7 +5,7 @@ if ( !defined( '_PS_VERSION_' ) )
 
 /**
 *   Version 1.6.1
-*   Last modified 2016-07-22
+*   Last modified 2016-08-18
 */
 
 class SuperFaktura extends Module
