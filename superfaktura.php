@@ -35,7 +35,7 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = 1.6;
+        $this->version       = '1.6.1';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
@@ -624,11 +624,6 @@ class SuperFaktura extends Module
             $data['Invoice']['invoice_currency'] = $currency->iso_code;
 
         //invoice items
-        echo '<pre>';
-        print_r($products);
-        echo '</pre>';
-        exit();
-        
         foreach ($products as $product)
         {
             $sku = $product['product_reference'];
@@ -752,34 +747,4 @@ class SuperFaktura extends Module
             $this->_createInvoice($order, $cart);
         }
     }
-
-
-    /*public function hookDisplayPDFInvoice($params)
-    {
-        if (isset($params['object']->id_order))
-        {
-            $response = $this->_request(self::SF_URL_GET_PDF_INVOICE . $params['object']->id_order);
-
-            if ("" != $response)
-            {
-
-                header("Pragma: public"); // required
-                header("Expires: 0");
-                header("Cache-Control: must-revalidate, post-check=0, pre-check=0");
-                header("Cache-Control: private",false); // required for certain browsers
-
-                header("Content-Type: application/force-download");
-                header("Content-Disposition: attachment; filename=\"invoice.pdf\";" );
-
-                header("Content-Transfer-Encoding: binary");
-                header("Content-Length: ".strlen($response));
-
-                echo $response;
-
-                exit();
-            }
-        }
-    }*/
-
-
 }
