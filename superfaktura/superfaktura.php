@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.6.1
-*   Last modified 2016-08-18
+*   Version 1.6.2
+*   Last modified 2016-08-23
 */
 
 class SuperFaktura extends Module
@@ -21,6 +21,7 @@ class SuperFaktura extends Module
         $sequence_id,
         $send_invoice, 
         $variable_source,
+        $invoice_language,
         $invoice_type;
 
     const API_AUTH_KEYWORD          = 'SFAPI';
@@ -35,12 +36,12 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.6.1';
+        $this->version       = '1.6.2';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
 
-        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE' ));
+        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE'));
 
         $this->email                    = isset($config['SUPERFAKTURA_EMAIL']) ? $config['SUPERFAKTURA_EMAIL'] : "";
         $this->apikey                   = isset($config['SUPERFAKTURA_APIKEY']) ? $config['SUPERFAKTURA_APIKEY'] : "";
@@ -52,6 +53,7 @@ class SuperFaktura extends Module
         $this->sequence_id              = isset($config['SUPERFAKTURA_SEQUENCE_ID']) ? $config['SUPERFAKTURA_SEQUENCE_ID'] : "";
         $this->send_invoice             = isset($config['SUPERFAKTURA_SEND_INVOICE']) ? $config['SUPERFAKTURA_SEND_INVOICE'] : 0;
         $this->invoice_type             = isset($config['SUPERFAKTURA_INVOICE_TYPE']) ? $config['SUPERFAKTURA_INVOICE_TYPE'] : 'regular';
+        $this->invoice_language         = isset($config['SUPERFAKTURA_INVOICE_LANGUAGE']) ? $config['SUPERFAKTURA_INVOICE_LANGUAGE'] : 'slo';
 
         parent::__construct();
 
@@ -106,6 +108,7 @@ class SuperFaktura extends Module
             && Configuration::deleteByName('SUPERFAKTURA_SET_INVOICE_PAID')
             && Configuration::deleteByName('SUPERFAKTURA_VARIABLE_SOURCE')
             && Configuration::deleteByName('SUPERFAKTURA_INVOICE_TYPE')
+            && Configuration::deleteByName('SUPERFAKTURA_INVOICE_LANGUAGE')
         );
     }
 
@@ -139,6 +142,7 @@ class SuperFaktura extends Module
                 Configuration::updateValue('SUPERFAKTURA_SEQUENCE_ID', Tools::getValue('sequence_id'));
                 Configuration::updateValue('SUPERFAKTURA_SEND_INVOICE', Tools::getValue('send_invoice'));
                 Configuration::updateValue('SUPERFAKTURA_INVOICE_TYPE', Tools::getValue('invoice_type'));
+                Configuration::updateValue('SUPERFAKTURA_INVOICE_LANGUAGE', Tools::getValue('invoice_language'));
 
                 $this->_html .= '<div class="conf"><img src="../img/admin/ok.gif" alt="'.$this->l('ok').'" /> '.$this->l('Nastavenia uložené').'</div>';
             }
@@ -219,8 +223,25 @@ class SuperFaktura extends Module
 
         $this->_html .= '       <strong>' . $this->l("Po vytvorení odoslať faktúru klientovi") . ': </strong><br />
                 <input type="checkbox" name="send_invoice" value="1"' . (1 == Tools::getValue('send_invoice', $this->send_invoice) ? ' checked="checked"' : '') . ' /><br />
-                <br />
         ';
+
+        $this->_html .= '
+                </select>
+                <strong>' . $this->l("Vyberte jazyk v ktorom chcete doklady vystavovať") . ':</strong><br />
+                <select name="invoice_language">
+        ';
+
+        $this->_html .= '<option value="slo"'.('slo' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Slovenčina").'</option>';
+        $this->_html .= '<option value="cze"'.('cze' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Čeština").'</option>';
+        $this->_html .= '<option value="eng"'.('eng' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Angličtina").'</option>';
+        $this->_html .= '<option value="deu"'.('deu' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Nemčina").'</option>';
+        $this->_html .= '<option value="rus"'.('rus' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Ruština").'</option>';
+        $this->_html .= '<option value="ukr"'.('ukr' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Ukrajinčina").'</option>';
+        $this->_html .= '<option value="hun"'.('hun' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Maďarčina").'</option>';
+        $this->_html .= '<option value="pol"'.('pol' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Poľština").'</option>';
+
+        $this->_html .= '
+                </select><br /><br />';
         
         $this->_html .= '
                 </select>
@@ -615,7 +636,8 @@ class SuperFaktura extends Module
         );
 
         $data['InvoiceSetting']['settings'] = json_encode(array(
-        	'signature' => true,
+        	'language' => $this->invoice_language,
+            'signature' => true,
         	'payment_info' => true,
         	'bysquare'     => true
         ));
