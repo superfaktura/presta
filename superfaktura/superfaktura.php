@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.6.3
-*   Last modified 2017-05-04
+*   Version 1.6.4
+*   Last modified 2017-05-22
 */
 
 class SuperFaktura extends Module
@@ -40,7 +40,7 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.6.3';
+        $this->version       = '1.6.4';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
@@ -296,6 +296,12 @@ class SuperFaktura extends Module
     private function _request($url, $data = "")
     {
         $c = curl_init();
+        if(!empty($data)){
+            $tmp_data = json_decode($data['data'], true);
+            $tmp_data['apptitle'] = $_SERVER['SERVER_NAME'];
+            $tmp_data['module'] = 'PrestaShop: '._PS_VERSION_.' module: '.$this->version.' ';
+            $data['data'] = json_encode($tmp_data);
+        }
 
         $options = array(
             CURLOPT_URL            => $url,
