@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.6.4
-*   Last modified 2017-05-22
+*   Version 1.6.5
+*   Last modified 2017-06-02
 */
 
 class SuperFaktura extends Module
@@ -730,7 +730,13 @@ class SuperFaktura extends Module
             );
         }
         $response = $this->_request(self::SF_URL_CREATE_INVOICE, array('data' => json_encode($data)));
-
+        
+        $response = json_decode($response);
+        
+        if (false == $response)
+        {
+             return;
+        }      
         
         //poslat fakturu emailom 
         if(isset($response->error) && $response->error == 0 && $this->send_invoice == 1){
@@ -744,12 +750,6 @@ class SuperFaktura extends Module
             $send = $this->_request(self::SF_URL_SEND_INVOICE, array('data' => json_encode($request_data)));
 
         }
-        if (false == $response)
-        {
-             return;
-        }
-
-        $response = json_decode($response);
 
         if ((isset($response->error) && (0 != $response->error)) || ! isset($response->data->Invoice->variable))
         {
