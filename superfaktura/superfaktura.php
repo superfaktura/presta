@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.6.5
-*   Last modified 2017-06-02
+*   Version 1.6.6
+*   Last modified 2017-10-16
 */
 
 class SuperFaktura extends Module
@@ -26,7 +26,8 @@ class SuperFaktura extends Module
         $issued_by,
         $issued_by_phone,
         $issued_by_web,
-        $issued_by_email;
+        $issued_by_email,
+        $by_square;
 
     const API_AUTH_KEYWORD          = 'SFAPI';
     const SF_URL_CREATE_INVOICE     = 'https://moja.superfaktura.sk/invoices/create';
@@ -45,7 +46,7 @@ class SuperFaktura extends Module
         $this->need_instance = 1;
 
 
-        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL'));
+        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE'));
 
         $this->email                    = isset($config['SUPERFAKTURA_EMAIL']) ? $config['SUPERFAKTURA_EMAIL'] : "";
         $this->apikey                   = isset($config['SUPERFAKTURA_APIKEY']) ? $config['SUPERFAKTURA_APIKEY'] : "";
@@ -62,6 +63,8 @@ class SuperFaktura extends Module
         $this->issued_by_phone          = isset($config['SUPERFAKTURA_ISSUED_BY_PHONE']) ? $config['SUPERFAKTURA_ISSUED_BY_PHONE'] : "";
         $this->issued_by_web            = isset($config['SUPERFAKTURA_ISSUED_BY_WEB']) ? $config['SUPERFAKTURA_ISSUED_BY_WEB'] : "";
         $this->issued_by_email          = isset($config['SUPERFAKTURA_ISSUED_BY_EMAIL']) ? $config['SUPERFAKTURA_ISSUED_BY_EMAIL'] : "";
+        $this->by_square                = isset($config['SUPERFAKTURA_BY_SQUARE']) ? $config['SUPERFAKTURA_BY_SQUARE'] : "";
+
 
         parent::__construct();
 
@@ -121,6 +124,7 @@ class SuperFaktura extends Module
             && Configuration::deleteByName('SUPERFAKTURA_ISSUED_BY_PHONE')
             && Configuration::deleteByName('SUPERFAKTURA_ISSUED_BY_WEB')
             && Configuration::deleteByName('SUPERFAKTURA_ISSUED_BY_EMAIL')
+            && Configuration::deleteByName('SUPERFAKTURA_BY_SQUARE')
         );
     }
 
@@ -158,7 +162,8 @@ class SuperFaktura extends Module
                 Configuration::updateValue('SUPERFAKTURA_ISSUED_BY', Tools::getValue('issued_by'));
                 Configuration::updateValue('SUPERFAKTURA_ISSUED_BY_PHONE', Tools::getValue('issued_by_phone'));
                 Configuration::updateValue('SUPERFAKTURA_ISSUED_BY_WEB', Tools::getValue('issued_by_web'));
-                Configuration::updateValue('SUPERFAKTURA_ISSUED_BY_EMAIL', Tools::getValue('issued_by_email'));
+                Configuration::updateValue('SUPERFAKTURA_ISSUED_BY_EMAIL', Tools::getValue('issued_by_email')); 
+                Configuration::updateValue('SUPERFAKTURA_BY_SQUARE', Tools::getValue('by_square'));
 
                 $this->_html .= '<div class="conf"><img src="../img/admin/ok.gif" alt="'.$this->l('ok').'" /> '.$this->l('Nastavenia uložené').'</div>';
             }
@@ -285,6 +290,10 @@ class SuperFaktura extends Module
         <strong>Email: </strong><br />
                 <input type="text" name="issued_by_email" size="50" value="' . htmlentities(Tools::getValue('issued_by_email', $this->issued_by_email), ENT_COMPAT, 'UTF-8') . '" /><br />
                 <br />
+        ';
+
+        $this->_html .= '       <strong>' . $this->l("Zobraziť Pay by square na faktúre") . ': </strong><br />
+                <input type="checkbox" name="by_square" value="1"' . (1 == Tools::getValue('by_square', $this->by_square) ? ' checked="checked"' : '') . ' /><br />
         ';
         $this->_html .= '        <input type="submit" name="btnSubmit" value="'.$this->l('Uložiť').'" class="button" />
             </form>
@@ -680,7 +689,7 @@ class SuperFaktura extends Module
             'language'     => $this->invoice_language,
             'signature'    => true,
             'payment_info' => true,
-            'bysquare'     => true
+            'bysquare'     => $this->by_square
         ));
 
         if (isset($currency->iso_code))
