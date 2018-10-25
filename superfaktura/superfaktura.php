@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.6.6
-*   Last modified 2017-10-16
+*   Version 1.6.7
+*   Last modified 2018-10-25
 */
 
 class SuperFaktura extends Module
@@ -372,6 +372,8 @@ class SuperFaktura extends Module
         $products = $order->getCartProducts();
 
 
+
+
         $name = $address->company;
         if (empty($name) && (("" != $address->firstname) || ("" != $address->lastname)))
         {
@@ -682,7 +684,9 @@ class SuperFaktura extends Module
             'issued_by'         => (!empty($this->issued_by)) ? $this->issued_by : '',
             'issued_by_phone'   => (!empty($this->issued_by_phone)) ? $this->issued_by_phone : '',
             'issued_by_web'     => (!empty($this->issued_by_web)) ? $this->issued_by_web : '',
-            'issued_by_email'   => (!empty($this->issued_by_email)) ? $this->issued_by_email : ''
+            'issued_by_email'   => (!empty($this->issued_by_email)) ? $this->issued_by_email : '',
+            'discount_total'    => (isset($order->total_discounts) && $order->total_discounts > 0) ? $order->total_discounts : null,
+
         );
 
         $data['InvoiceSetting']['settings'] = json_encode(array(
@@ -729,15 +733,6 @@ class SuperFaktura extends Module
             );
         }
 
-        //discount
-        if(isset($order->total_discounts) && $order->total_discounts > 0){
-            $data['InvoiceItem'][] = array(
-                'name'        => 'Zľava',
-                'unit_price'  => ( $order->total_discounts / (1 + ($order->carrier_tax_rate / 100)))  * -1,
-                'tax'         => $order->carrier_tax_rate,
-
-            );
-        }
         $response = $this->_request(self::SF_URL_CREATE_INVOICE, array('data' => json_encode($data)));
         
         $response = json_decode($response);
