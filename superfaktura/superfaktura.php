@@ -41,7 +41,7 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.6.6';
+        $this->version       = '1.6.7';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
