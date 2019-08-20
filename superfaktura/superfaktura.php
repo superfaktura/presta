@@ -712,7 +712,7 @@ class SuperFaktura extends Module
                 'description' => trim((isset($product['attributes_small']) ? strip_tags($product['attributes_small']) : "").PHP_EOL.$sku),
                 'quantity'    => $product['product_quantity'],
                 'unit'        => 'ks',
-                'unit_price'  => $product['price'],
+                'unit_price'  => $product['unit_price_tax_excl'],
                 'tax'         => $product['tax_rate'],
                 'sku'         => $sku
             );
