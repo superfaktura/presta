@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.6.7
-*   Last modified 2018-10-25
+*   Version 1.6.8
+*   Last modified 2019-08-20
 */
 
 class SuperFaktura extends Module
@@ -712,7 +712,7 @@ class SuperFaktura extends Module
                 'description' => trim((isset($product['attributes_small']) ? strip_tags($product['attributes_small']) : "").PHP_EOL.$sku),
                 'quantity'    => $product['product_quantity'],
                 'unit'        => 'ks',
-                'unit_price'  => $product['product_price'],
+                'unit_price'  => $product['price'],
                 'tax'         => $product['tax_rate'],
                 'sku'         => $sku
             );
