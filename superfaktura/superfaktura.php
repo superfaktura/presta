@@ -5,7 +5,7 @@ if ( !defined( '_PS_VERSION_' ) )
 
 /**
 *   Version 1.6.8
-*   Last modified 2019-08-20
+*   Last modified 2019-10-22
 */
 
 class SuperFaktura extends Module
@@ -27,7 +27,8 @@ class SuperFaktura extends Module
         $issued_by_phone,
         $issued_by_web,
         $issued_by_email,
-        $by_square;
+        $by_square,
+        $logo_id;
 
     const API_AUTH_KEYWORD          = 'SFAPI';
     const SF_URL_CREATE_INVOICE     = 'https://moja.superfaktura.sk/invoices/create';
@@ -41,12 +42,12 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.6.7';
+        $this->version       = '1.6.8';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
 
-        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE'));
+        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID'));
 
         $this->email                    = isset($config['SUPERFAKTURA_EMAIL']) ? $config['SUPERFAKTURA_EMAIL'] : "";
         $this->apikey                   = isset($config['SUPERFAKTURA_APIKEY']) ? $config['SUPERFAKTURA_APIKEY'] : "";
@@ -64,6 +65,8 @@ class SuperFaktura extends Module
         $this->issued_by_web            = isset($config['SUPERFAKTURA_ISSUED_BY_WEB']) ? $config['SUPERFAKTURA_ISSUED_BY_WEB'] : "";
         $this->issued_by_email          = isset($config['SUPERFAKTURA_ISSUED_BY_EMAIL']) ? $config['SUPERFAKTURA_ISSUED_BY_EMAIL'] : "";
         $this->by_square                = isset($config['SUPERFAKTURA_BY_SQUARE']) ? $config['SUPERFAKTURA_BY_SQUARE'] : "";
+        $this->logo_id                  = isset($config['SUPERFAKTURA_LOGO_ID']) ? $config['SUPERFAKTURA_LOGO_ID'] : "";
+
 
 
         parent::__construct();
@@ -125,6 +128,8 @@ class SuperFaktura extends Module
             && Configuration::deleteByName('SUPERFAKTURA_ISSUED_BY_WEB')
             && Configuration::deleteByName('SUPERFAKTURA_ISSUED_BY_EMAIL')
             && Configuration::deleteByName('SUPERFAKTURA_BY_SQUARE')
+            && Configuration::deleteByName('SUPERFAKTURA_LOGO_ID')
+
         );
     }
 
@@ -164,6 +169,8 @@ class SuperFaktura extends Module
                 Configuration::updateValue('SUPERFAKTURA_ISSUED_BY_WEB', Tools::getValue('issued_by_web'));
                 Configuration::updateValue('SUPERFAKTURA_ISSUED_BY_EMAIL', Tools::getValue('issued_by_email')); 
                 Configuration::updateValue('SUPERFAKTURA_BY_SQUARE', Tools::getValue('by_square'));
+                Configuration::updateValue('SUPERFAKTURA_LOGO_ID', Tools::getValue('logo_id'));
+
 
                 $this->_html .= '<div class="conf"><img src="../img/admin/ok.gif" alt="'.$this->l('ok').'" /> '.$this->l('Nastavenia uložené').'</div>';
             }
@@ -238,6 +245,9 @@ class SuperFaktura extends Module
                 <br />
         <strong>ID číselníku pod ktorým chcete vystavovať doklady: </strong><br />
                 <input type="text" name="sequence_id" size="50" value="' . htmlentities(Tools::getValue('sequence_id', $this->sequence_id), ENT_COMPAT, 'UTF-8') . '" /><br />
+                <br />
+         <strong>ID loga ktoré chcete zobrazovať na doklade: </strong><br />
+                <input type="text" name="logo_id" size="50" value="' . htmlentities(Tools::getValue('logo_id', $this->logo_id), ENT_COMPAT, 'UTF-8') . '" /><br />
                 <br />
         ';
 
@@ -686,6 +696,7 @@ class SuperFaktura extends Module
             'issued_by_web'     => (!empty($this->issued_by_web)) ? $this->issued_by_web : '',
             'issued_by_email'   => (!empty($this->issued_by_email)) ? $this->issued_by_email : '',
             'discount_total'    => (isset($order->total_discounts) && $order->total_discounts > 0) ? $order->total_discounts : null,
+            'logo_id'           => (!empty($this->logo_id)) ? $this->logo_id : '',
 
         );
 
