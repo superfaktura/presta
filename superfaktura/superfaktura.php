@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.6.8
-*   Last modified 2019-10-22
+*   Version 1.7.0
+*   Last modified 2020-03-26
 */
 
 class SuperFaktura extends Module
@@ -28,7 +28,13 @@ class SuperFaktura extends Module
         $issued_by_web,
         $issued_by_email,
         $by_square,
-        $logo_id;
+        $logo_id,
+        $bank_id,
+        $cancel_sequence_id,
+        $product_syntetic,
+        $product_analytic,
+        $carrier_syntetic,
+        $carrier_analytic;
 
     const API_AUTH_KEYWORD          = 'SFAPI';
     const SF_URL_CREATE_INVOICE     = 'https://moja.superfaktura.sk/invoices/create';
@@ -42,12 +48,12 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.6.8';
+        $this->version       = '1.7.0';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
 
-        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID'));
+        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID', 'SUPERFAKTURA_BANK_ID', 'SUPERFAKTURA_CANCEL_SEQUENCE_ID', 'SUPERFAKTURA_PRODUCT_SYNTETIC', 'SUPERFAKTURA_PRODUCT_ANALYTIC', 'SUPERFAKTURA_CARRIER_SYNTETIC', 'SUPERFAKTURA_CARRIER_ANALYTIC'));
 
         $this->email                    = isset($config['SUPERFAKTURA_EMAIL']) ? $config['SUPERFAKTURA_EMAIL'] : "";
         $this->apikey                   = isset($config['SUPERFAKTURA_APIKEY']) ? $config['SUPERFAKTURA_APIKEY'] : "";
@@ -66,6 +72,17 @@ class SuperFaktura extends Module
         $this->issued_by_email          = isset($config['SUPERFAKTURA_ISSUED_BY_EMAIL']) ? $config['SUPERFAKTURA_ISSUED_BY_EMAIL'] : "";
         $this->by_square                = isset($config['SUPERFAKTURA_BY_SQUARE']) ? $config['SUPERFAKTURA_BY_SQUARE'] : "";
         $this->logo_id                  = isset($config['SUPERFAKTURA_LOGO_ID']) ? $config['SUPERFAKTURA_LOGO_ID'] : "";
+        $this->bank_id                  = isset($config['SUPERFAKTURA_BANK_ID']) ? $config['SUPERFAKTURA_BANK_ID'] : "";
+        $this->cancel_sequence_id       = isset($config['SUPERFAKTURA_CANCEL_SEQUENCE_ID']) ? $config['SUPERFAKTURA_CANCEL_SEQUENCE_ID'] : "";
+        
+        $this->product_syntetic         = isset($config['SUPERFAKTURA_PRODUCT_SYNTETIC']) ? $config['SUPERFAKTURA_PRODUCT_SYNTETIC'] : "";
+        $this->product_analytic         = isset($config['SUPERFAKTURA_PRODUCT_ANALYTIC']) ? $config['SUPERFAKTURA_PRODUCT_ANALYTIC'] : "";
+        $this->carrier_syntetic         = isset($config['SUPERFAKTURA_CARRIER_SYNTETIC']) ? $config['SUPERFAKTURA_CARRIER_SYNTETIC'] : "";
+        $this->carrier_analytic         = isset($config['SUPERFAKTURA_CARRIER_ANALYTIC']) ? $config['SUPERFAKTURA_CARRIER_ANALYTIC'] : "";
+
+
+
+
 
 
 
@@ -129,7 +146,12 @@ class SuperFaktura extends Module
             && Configuration::deleteByName('SUPERFAKTURA_ISSUED_BY_EMAIL')
             && Configuration::deleteByName('SUPERFAKTURA_BY_SQUARE')
             && Configuration::deleteByName('SUPERFAKTURA_LOGO_ID')
-
+            && Configuration::deleteByName('SUPERFAKTURA_BANK_ID')
+            && Configuration::deleteByName('SUPERFAKTURA_CANCEL_SEQUENCE_ID')
+            && Configuration::deleteByName('SUPERFAKTURA_PRODUCT_SYNTETIC')
+            && Configuration::deleteByName('SUPERFAKTURA_PRODUCT_ANALYTIC')
+            && Configuration::deleteByName('SUPERFAKTURA_CARRIER_SYNTETIC')
+            && Configuration::deleteByName('SUPERFAKTURA_CARRIER_ANALYTIC')
         );
     }
 
@@ -170,7 +192,12 @@ class SuperFaktura extends Module
                 Configuration::updateValue('SUPERFAKTURA_ISSUED_BY_EMAIL', Tools::getValue('issued_by_email')); 
                 Configuration::updateValue('SUPERFAKTURA_BY_SQUARE', Tools::getValue('by_square'));
                 Configuration::updateValue('SUPERFAKTURA_LOGO_ID', Tools::getValue('logo_id'));
-
+                Configuration::updateValue('SUPERFAKTURA_BANK_ID', Tools::getValue('bank_id'));
+                Configuration::updateValue('SUPERFAKTURA_CANCEL_SEQUENCE_ID', Tools::getValue('cancel_sequence_id'));
+                Configuration::updateValue('SUPERFAKTURA_PRODUCT_SYNTETIC', Tools::getValue('product_syntetic'));
+                Configuration::updateValue('SUPERFAKTURA_PRODUCT_ANALYTIC', Tools::getValue('product_analytic'));
+                Configuration::updateValue('SUPERFAKTURA_CARRIER_SYNTETIC', Tools::getValue('carrier_syntetic'));
+                Configuration::updateValue('SUPERFAKTURA_CARRIER_ANALYTIC', Tools::getValue('carrier_analytic'));
 
                 $this->_html .= '<div class="conf"><img src="../img/admin/ok.gif" alt="'.$this->l('ok').'" /> '.$this->l('Nastavenia uložené').'</div>';
             }
@@ -246,8 +273,14 @@ class SuperFaktura extends Module
         <strong>ID číselníku pod ktorým chcete vystavovať doklady: </strong><br />
                 <input type="text" name="sequence_id" size="50" value="' . htmlentities(Tools::getValue('sequence_id', $this->sequence_id), ENT_COMPAT, 'UTF-8') . '" /><br />
                 <br />
-         <strong>ID loga ktoré chcete zobrazovať na doklade: </strong><br />
+         <strong>ID číselníku pod ktorým chcete vystavovať dobropisy: </strong><br />
+                <input type="text" name="cancel_sequence_id" size="50" value="' . htmlentities(Tools::getValue('cancel_sequence_id', $this->cancel_sequence_id), ENT_COMPAT, 'UTF-8') . '" /><br />
+                <br />
+        <strong>ID loga ktoré chcete zobrazovať na doklade: </strong><br />
                 <input type="text" name="logo_id" size="50" value="' . htmlentities(Tools::getValue('logo_id', $this->logo_id), ENT_COMPAT, 'UTF-8') . '" /><br />
+                <br />
+        <strong>ID bank. účtu, ktoré chcete zobrazovať na doklade: </strong><br />
+                <input type="text" name="bank_id" size="50" value="' . htmlentities(Tools::getValue('bank_id', $this->bank_id), ENT_COMPAT, 'UTF-8') . '" /><br />
                 <br />
         ';
 
@@ -305,6 +338,24 @@ class SuperFaktura extends Module
         $this->_html .= '       <strong>' . $this->l("Zobraziť Pay by square na faktúre") . ': </strong><br />
                 <input type="checkbox" name="by_square" value="1"' . (1 == Tools::getValue('by_square', $this->by_square) ? ' checked="checked"' : '') . ' /><br />
         ';
+
+        $this->_html .= '<br /><strong>' . $this->l("Účtovníctvo") . ': </strong><br />';
+        $this->_html .= '
+                <br />
+        <strong> Syntetický účet pre produkty: </strong><br />
+                <input type="text" name="product_syntetic" size="50" value="' . htmlentities(Tools::getValue('product_syntetic', $this->product_syntetic), ENT_COMPAT, 'UTF-8') . '" /><br />
+                <br />
+         <strong>Analytický účet pre produkty: </strong><br />
+                <input type="text" name="product_analytic" size="50" value="' . htmlentities(Tools::getValue('product_analytic', $this->product_analytic), ENT_COMPAT, 'UTF-8') . '" /><br />
+                <br />
+        <strong>Syntetický účet pre dopravu: </strong><br />
+                <input type="text" name="carrier_syntetic" size="50" value="' . htmlentities(Tools::getValue('carrier_syntetic', $this->carrier_syntetic), ENT_COMPAT, 'UTF-8') . '" /><br />
+                <br />
+        <strong>Analytický účet pre dopravu: </strong><br />
+                <input type="text" name="carrier_analytic" size="50" value="' . htmlentities(Tools::getValue('carrier_analytic', $this->carrier_analytic), ENT_COMPAT, 'UTF-8') . '" /><br />
+                <br />
+        ';
+
         $this->_html .= '        <input type="submit" name="btnSubmit" value="'.$this->l('Uložiť').'" class="button" />
             </form>
             </div>   
@@ -700,6 +751,14 @@ class SuperFaktura extends Module
 
         );
 
+        if (!empty($this->bank_id)) {
+            $data['Invoice']['bank_accounts'] = array(
+                array(
+                    'id' => $this->bank_id,
+                )
+            );
+        }
+
         $data['InvoiceSetting']['settings'] = json_encode(array(
             'language'     => $this->invoice_language,
             'signature'    => true,
@@ -725,8 +784,16 @@ class SuperFaktura extends Module
                 'unit'        => 'ks',
                 'unit_price'  => $product['unit_price_tax_excl'],
                 'tax'         => $product['tax_rate'],
-                'sku'         => $sku
+                'sku'         => $sku,
             );
+
+            if (!empty($this->product_analytic) || !empty($this->product_syntetic)) {
+                end($data['InvoiceItem']); 
+                $data['InvoiceItem'][key($data['InvoiceItem'])]['AccountingDetail'] = array(
+                    'analytics_account' => (!empty($this->product_analytic)) ? $this->product_analytic : '',
+                    'synthetic_account' => (!empty($this->product_syntetic)) ? $this->product_syntetic : '',
+                );
+            }
         }
 
         //shipping
@@ -740,9 +807,18 @@ class SuperFaktura extends Module
                 'quantity'    => 1,
                 'unit'        => 'ks',
                 'unit_price'  => $shipping,
-                'tax'         => $shipping_tax
+                'tax'         => $shipping_tax,
             );
+
+            if (!empty($this->carrier_syntetic) || !empty($this->carrier_analytic)) {
+                end($data['InvoiceItem']); 
+                $data['InvoiceItem'][key($data['InvoiceItem'])]['AccountingDetail'] = array(
+                    'analytics_account' => (!empty($this->carrier_analytic)) ? $this->carrier_analytic : '',
+                    'synthetic_account' => (!empty($this->carrier_syntetic)) ? $this->carrier_syntetic : '',
+                );
+            }
         }
+
 
         $response = $this->_request(self::SF_URL_CREATE_INVOICE, array('data' => json_encode($data)));
         
@@ -813,7 +889,7 @@ class SuperFaktura extends Module
     {
         if (intval($this->id_order_state_refund) == intval($params['newOrderStatus']->id))
         {      
-            $response = $this->_request(self::SF_URL_CREATE_CANCEL . $params['id_order']);
+            $response = $this->_request(self::SF_URL_CREATE_CANCEL . $params['id_order'] . (!empty($this->cancel_sequence_id) ? '/sequence_id:' . $this->cancel_sequence_id : ''));
         }
         elseif ($this->id_order_state_invoice == $params['newOrderStatus']->id)
         {
