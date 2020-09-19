@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.7.0
-*   Last modified 2020-03-26
+*   Version 1.7.1
+*   Last modified 2020-09-19
 */
 
 class SuperFaktura extends Module
@@ -34,7 +34,10 @@ class SuperFaktura extends Module
         $product_syntetic,
         $product_analytic,
         $carrier_syntetic,
-        $carrier_analytic;
+        $carrier_analytic,
+        $callback_payment,
+        $paypal,
+        $online_payment;
 
     const API_AUTH_KEYWORD          = 'SFAPI';
     const SF_URL_CREATE_INVOICE     = 'https://moja.superfaktura.sk/invoices/create';
@@ -48,12 +51,12 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.7.0';
+        $this->version       = '1.7.1';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
 
-        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID', 'SUPERFAKTURA_BANK_ID', 'SUPERFAKTURA_CANCEL_SEQUENCE_ID', 'SUPERFAKTURA_PRODUCT_SYNTETIC', 'SUPERFAKTURA_PRODUCT_ANALYTIC', 'SUPERFAKTURA_CARRIER_SYNTETIC', 'SUPERFAKTURA_CARRIER_ANALYTIC'));
+        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID', 'SUPERFAKTURA_BANK_ID', 'SUPERFAKTURA_CANCEL_SEQUENCE_ID', 'SUPERFAKTURA_PRODUCT_SYNTETIC', 'SUPERFAKTURA_PRODUCT_ANALYTIC', 'SUPERFAKTURA_CARRIER_SYNTETIC', 'SUPERFAKTURA_CARRIER_ANALYTIC', 'SUPERFAKTURA_CALLBACK_PAYMENT', 'SUPERFAKTURA_PAYPAL', 'SUPERFAKTURA_ONLINE_PAYMENT'));
 
         $this->email                    = isset($config['SUPERFAKTURA_EMAIL']) ? $config['SUPERFAKTURA_EMAIL'] : "";
         $this->apikey                   = isset($config['SUPERFAKTURA_APIKEY']) ? $config['SUPERFAKTURA_APIKEY'] : "";
@@ -74,17 +77,13 @@ class SuperFaktura extends Module
         $this->logo_id                  = isset($config['SUPERFAKTURA_LOGO_ID']) ? $config['SUPERFAKTURA_LOGO_ID'] : "";
         $this->bank_id                  = isset($config['SUPERFAKTURA_BANK_ID']) ? $config['SUPERFAKTURA_BANK_ID'] : "";
         $this->cancel_sequence_id       = isset($config['SUPERFAKTURA_CANCEL_SEQUENCE_ID']) ? $config['SUPERFAKTURA_CANCEL_SEQUENCE_ID'] : "";
-        
         $this->product_syntetic         = isset($config['SUPERFAKTURA_PRODUCT_SYNTETIC']) ? $config['SUPERFAKTURA_PRODUCT_SYNTETIC'] : "";
         $this->product_analytic         = isset($config['SUPERFAKTURA_PRODUCT_ANALYTIC']) ? $config['SUPERFAKTURA_PRODUCT_ANALYTIC'] : "";
         $this->carrier_syntetic         = isset($config['SUPERFAKTURA_CARRIER_SYNTETIC']) ? $config['SUPERFAKTURA_CARRIER_SYNTETIC'] : "";
         $this->carrier_analytic         = isset($config['SUPERFAKTURA_CARRIER_ANALYTIC']) ? $config['SUPERFAKTURA_CARRIER_ANALYTIC'] : "";
-
-
-
-
-
-
+        $this->online_payment           = isset($config['SUPERFAKTURA_ONLINE_PAYMENT']) ? $config['SUPERFAKTURA_ONLINE_PAYMENT'] : "";
+        $this->paypal                   = isset($config['SUPERFAKTURA_PAYPAL']) ? $config['SUPERFAKTURA_PAYPAL'] : "";
+        $this->callback_payment         = isset($config['SUPERFAKTURA_CALLBACK_PAYMENT']) ? $config['SUPERFAKTURA_CALLBACK_PAYMENT'] : "";
 
         parent::__construct();
 
@@ -152,6 +151,9 @@ class SuperFaktura extends Module
             && Configuration::deleteByName('SUPERFAKTURA_PRODUCT_ANALYTIC')
             && Configuration::deleteByName('SUPERFAKTURA_CARRIER_SYNTETIC')
             && Configuration::deleteByName('SUPERFAKTURA_CARRIER_ANALYTIC')
+            && Configuration::deleteByName('SUPERFAKTURA_CALLBACK_PAYMENT')
+            && Configuration::deleteByName('SUPERFAKTURA_PAYPAL')
+            && Configuration::deleteByName('SUPERFAKTURA_ONLINE_PAYMENT')
         );
     }
 
@@ -198,6 +200,9 @@ class SuperFaktura extends Module
                 Configuration::updateValue('SUPERFAKTURA_PRODUCT_ANALYTIC', Tools::getValue('product_analytic'));
                 Configuration::updateValue('SUPERFAKTURA_CARRIER_SYNTETIC', Tools::getValue('carrier_syntetic'));
                 Configuration::updateValue('SUPERFAKTURA_CARRIER_ANALYTIC', Tools::getValue('carrier_analytic'));
+                Configuration::updateValue('SUPERFAKTURA_ONLINE_PAYMENT', Tools::getValue('online_payment'));
+                Configuration::updateValue('SUPERFAKTURA_PAYPAL', Tools::getValue('paypal'));
+                Configuration::updateValue('SUPERFAKTURA_CALLBACK_PAYMENT', Tools::getValue('callback_payment'));
 
                 $this->_html .= '<div class="conf"><img src="../img/admin/ok.gif" alt="'.$this->l('ok').'" /> '.$this->l('Nastavenia uložené').'</div>';
             }
@@ -245,8 +250,8 @@ class SuperFaktura extends Module
                 </select><br />
                 <br />
 
-                <strong>' . $this->l("Pri vytvorení faktúry ju nastaviť ako uhradenú") . ': </strong><br />
-                <input type="checkbox" name="set_invoice_paid" value="1"' . (1 == Tools::getValue('set_invoice_paid', $this->set_invoice_paid) ? ' checked="checked"' : '') . ' /><br />
+                <input type="checkbox" name="set_invoice_paid" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('set_invoice_paid', $this->set_invoice_paid) ? ' checked="checked"' : '') . ' />
+                <strong>' . $this->l("Pri vytvorení faktúry ju nastaviť ako uhradenú") . ': </strong><br /><br />
                 <br />
 
                 <strong>' . $this->l("Stav objednávky pre vytvorenie dobropisu") . ': <sup>*</sup></strong><br />
@@ -285,8 +290,9 @@ class SuperFaktura extends Module
         ';
 
 
-        $this->_html .= '       <strong>' . $this->l("Po vytvorení odoslať faktúru klientovi") . ': </strong><br />
-                <input type="checkbox" name="send_invoice" value="1"' . (1 == Tools::getValue('send_invoice', $this->send_invoice) ? ' checked="checked"' : '') . ' /><br />
+        $this->_html .= '       
+                <input type="checkbox" name="send_invoice" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('send_invoice', $this->send_invoice) ? ' checked="checked"' : '') . ' />
+                <strong>' . $this->l("Po vytvorení odoslať faktúru klientovi") . ': </strong><br /><br />
         ';
 
         $this->_html .= '
@@ -335,9 +341,18 @@ class SuperFaktura extends Module
                 <br />
         ';
 
-        $this->_html .= '       <strong>' . $this->l("Zobraziť Pay by square na faktúre") . ': </strong><br />
-                <input type="checkbox" name="by_square" value="1"' . (1 == Tools::getValue('by_square', $this->by_square) ? ' checked="checked"' : '') . ' /><br />
+        $this->_html .= '       
+                <input type="checkbox" name="by_square" value="1" style="margin-right: 5px;" ' . (1 == Tools::getValue('by_square', $this->by_square) ? ' checked="checked"' : '') . ' />
+                <strong>' . $this->l("Zobraziť Pay by square na faktúre") .     ': </strong><br />
+                <input type="checkbox" name="online_payment" value="1" style="margin-right: 5px;" ' . (1 == Tools::getValue('online_payment', $this->online_payment) ? ' checked="checked"' : '') . ' />
+                <strong>' . $this->l("Zobraziť Online platby na faktúre") . ': </strong><br />
+                <input type="checkbox" name="paypal" value="1" style="margin-right: 5px;" ' . (1 == Tools::getValue('paypal', $this->paypal) ? ' checked="checked"' : '') . ' />
+                <strong>' . $this->l("Zobraziť Paypal na faktúre") . ': </strong> <br /><br />
         ';
+
+        $this->_html .= '
+            <strong>Payment callback. URL, <br /> ktorá sa automaticky zavolá po pridaní úhrady k faktúre </strong><br />
+            <input type="text" name="callback_payment" size="50" value="' . htmlentities(Tools::getValue('callback_payment', $this->callback_payment), ENT_COMPAT, 'UTF-8') . '" /><br />';
 
         $this->_html .= '<br /><strong>' . $this->l("Účtovníctvo") . ': </strong><br />';
         $this->_html .= '
@@ -760,10 +775,13 @@ class SuperFaktura extends Module
         }
 
         $data['InvoiceSetting']['settings'] = json_encode(array(
-            'language'     => $this->invoice_language,
-            'signature'    => true,
-            'payment_info' => true,
-            'bysquare'     => $this->by_square
+            'language'         => $this->invoice_language,
+            'signature'        => true,
+            'payment_info'     => true,
+            'bysquare'         => $this->by_square,
+            'online_payment'   => $this->online_payment,
+            'paypal'           => $this->paypal,
+            'callback_payment' => $this->callback_payment,
         ));
 
         if (isset($currency->iso_code))
