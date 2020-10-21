@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.7.1
-*   Last modified 2020-09-19
+*   Version 1.7.2
+*   Last modified 2020-10-21
 */
 
 class SuperFaktura extends Module
@@ -37,7 +37,8 @@ class SuperFaktura extends Module
         $carrier_analytic,
         $callback_payment,
         $paypal,
-        $online_payment;
+        $online_payment,
+        $update_addressbook;
 
     const API_AUTH_KEYWORD          = 'SFAPI';
     const SF_URL_CREATE_INVOICE     = 'https://moja.superfaktura.sk/invoices/create';
@@ -51,12 +52,12 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.7.1';
+        $this->version       = '1.7.2';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
 
-        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID', 'SUPERFAKTURA_BANK_ID', 'SUPERFAKTURA_CANCEL_SEQUENCE_ID', 'SUPERFAKTURA_PRODUCT_SYNTETIC', 'SUPERFAKTURA_PRODUCT_ANALYTIC', 'SUPERFAKTURA_CARRIER_SYNTETIC', 'SUPERFAKTURA_CARRIER_ANALYTIC', 'SUPERFAKTURA_CALLBACK_PAYMENT', 'SUPERFAKTURA_PAYPAL', 'SUPERFAKTURA_ONLINE_PAYMENT'));
+        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID', 'SUPERFAKTURA_BANK_ID', 'SUPERFAKTURA_CANCEL_SEQUENCE_ID', 'SUPERFAKTURA_PRODUCT_SYNTETIC', 'SUPERFAKTURA_PRODUCT_ANALYTIC', 'SUPERFAKTURA_CARRIER_SYNTETIC', 'SUPERFAKTURA_CARRIER_ANALYTIC', 'SUPERFAKTURA_CALLBACK_PAYMENT', 'SUPERFAKTURA_PAYPAL', 'SUPERFAKTURA_ONLINE_PAYMENT', 'SUPERFAKTURA_UPDATE_ADDRESSBOOK'));
 
         $this->email                    = isset($config['SUPERFAKTURA_EMAIL']) ? $config['SUPERFAKTURA_EMAIL'] : "";
         $this->apikey                   = isset($config['SUPERFAKTURA_APIKEY']) ? $config['SUPERFAKTURA_APIKEY'] : "";
@@ -84,6 +85,8 @@ class SuperFaktura extends Module
         $this->online_payment           = isset($config['SUPERFAKTURA_ONLINE_PAYMENT']) ? $config['SUPERFAKTURA_ONLINE_PAYMENT'] : "";
         $this->paypal                   = isset($config['SUPERFAKTURA_PAYPAL']) ? $config['SUPERFAKTURA_PAYPAL'] : "";
         $this->callback_payment         = isset($config['SUPERFAKTURA_CALLBACK_PAYMENT']) ? $config['SUPERFAKTURA_CALLBACK_PAYMENT'] : "";
+        $this->update_addressbook       = isset($config['SUPERFAKTURA_UPDATE_ADDRESSBOOK']) ? $config['SUPERFAKTURA_UPDATE_ADDRESSBOOK'] : "";
+
 
         parent::__construct();
 
@@ -154,6 +157,8 @@ class SuperFaktura extends Module
             && Configuration::deleteByName('SUPERFAKTURA_CALLBACK_PAYMENT')
             && Configuration::deleteByName('SUPERFAKTURA_PAYPAL')
             && Configuration::deleteByName('SUPERFAKTURA_ONLINE_PAYMENT')
+            && Configuration::deleteByName('SUPERFAKTURA_UPDATE_ADDRESSBOOK')
+
         );
     }
 
@@ -203,6 +208,7 @@ class SuperFaktura extends Module
                 Configuration::updateValue('SUPERFAKTURA_ONLINE_PAYMENT', Tools::getValue('online_payment'));
                 Configuration::updateValue('SUPERFAKTURA_PAYPAL', Tools::getValue('paypal'));
                 Configuration::updateValue('SUPERFAKTURA_CALLBACK_PAYMENT', Tools::getValue('callback_payment'));
+                Configuration::updateValue('SUPERFAKTURA_UPDATE_ADDRESSBOOK', Tools::getValue('update_addressbook'));
 
                 $this->_html .= '<div class="conf"><img src="../img/admin/ok.gif" alt="'.$this->l('ok').'" /> '.$this->l('Nastavenia uložené').'</div>';
             }
@@ -289,10 +295,14 @@ class SuperFaktura extends Module
                 <br />
         ';
 
-
         $this->_html .= '       
                 <input type="checkbox" name="send_invoice" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('send_invoice', $this->send_invoice) ? ' checked="checked"' : '') . ' />
-                <strong>' . $this->l("Po vytvorení odoslať faktúru klientovi") . ': </strong><br /><br />
+                <strong>' . $this->l("Po vytvorení dokladu odoslať faktúru klientovi") . '</strong><br /><br />
+        ';
+        
+        $this->_html .= '       
+                <input type="checkbox" name="update_addressbook" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('update_addressbook', $this->update_addressbook) ? ' checked="checked"' : '') . ' />
+                <strong>' . $this->l("Po vytvorení dokladu zaktualizuje údaje klienta") . '</strong><br /><br />
         ';
 
         $this->_html .= '
@@ -743,7 +753,8 @@ class SuperFaktura extends Module
             'phone'               => ("" != $address->phone_mobile ? $address->phone_mobile : $address->phone),
             'email'               => $customer->email,
             'ic_dph'              => $ic_dph,
-            'dic'                 => $dic
+            'dic'                 => $dic,
+            'update_addressbook'  => !empty($this->update_addressbook),
         );
 
         $data['Invoice'] = array(
