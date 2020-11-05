@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.7.2
-*   Last modified 2020-10-21
+*   Version 1.7.3
+*   Last modified 2020-11-05
 */
 
 class SuperFaktura extends Module
@@ -319,7 +319,11 @@ class SuperFaktura extends Module
         $this->_html .= '<option value="ukr"'.('ukr' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Ukrajinčina").'</option>';
         $this->_html .= '<option value="hun"'.('hun' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Maďarčina").'</option>';
         $this->_html .= '<option value="pol"'.('pol' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Poľština").'</option>';
-
+        $this->_html .= '<option value="rom"'.('pol' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Rumunčina").'</option>';
+        $this->_html .= '<option value="hrv"'.('pol' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Chorvátčina").'</option>';
+        $this->_html .= '<option value="slv"'.('pol' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Slovinčina").'</option>';
+        $this->_html .= '<option value="spa"'.('pol' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Španielčina").'</option>';
+        $this->_html .= '<option value="ita"'.('pol' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Taliančina").'</option>';
         $this->_html .= '
                 </select><br /><br />';
         
