@@ -324,6 +324,7 @@ class SuperFaktura extends Module
         $this->_html .= '<option value="slv"'.('slv' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Slovinčina").'</option>';
         $this->_html .= '<option value="spa"'.('spa' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Španielčina").'</option>';
         $this->_html .= '<option value="ita"'.('ita' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Taliančina").'</option>';
+        $this->_html .= '<option value="nld"'.('nld' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Holandčina").'</option>';
         $this->_html .= '
                 </select><br /><br />';
         
