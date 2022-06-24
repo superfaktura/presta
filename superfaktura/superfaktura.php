@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.7.3
-*   Last modified 2020-11-05
+*   Version 1.7.4
+*   Last modified 2022-06-24
 */
 
 class SuperFaktura extends Module
@@ -38,15 +38,18 @@ class SuperFaktura extends Module
         $callback_payment,
         $paypal,
         $online_payment,
-        $update_addressbook;
+        $update_addressbook,
+        $use_sandbox;
 
     const API_AUTH_KEYWORD          = 'SFAPI';
-    const SF_URL_CREATE_INVOICE     = 'https://moja.superfaktura.sk/invoices/create';
-    const SF_URL_CREATE_CLIENT      = 'https://moja.superfaktura.sk/clients/create';
-    const SF_URL_PAY_INVOICE        = 'https://moja.superfaktura.sk/invoice_payments/add/ajax:1/api:1/import_type:prestashop/import_id:';
-    const SF_URL_CREATE_CANCEL      = 'https://moja.superfaktura.sk/invoices/cancelFromRegular/0/import_type:prestashop/import_id:';
-    const SF_URL_GET_PDF_INVOICE    = 'https://moja.superfaktura.sk/invoices/pdf/0/import_type:prestashop/import_id:';
-    const SF_URL_SEND_INVOICE       = 'https://moja.superfaktura.sk/invoices/send';
+    const SF_URL_CREATE_INVOICE     = '/invoices/create';
+    const SF_URL_CREATE_CLIENT      = '/clients/create';
+    const SF_URL_PAY_INVOICE        = '/invoice_payments/add/ajax:1/api:1/import_type:prestashop/import_id:';
+    const SF_URL_CREATE_CANCEL      = '/invoices/cancelFromRegular/0/import_type:prestashop/import_id:';
+    const SF_URL_GET_PDF_INVOICE    = '/invoices/pdf/0/import_type:prestashop/import_id:';
+    const SF_URL_SEND_INVOICE       = '/invoices/send';
+    const SF_URL                    = 'https://moja.superfaktura.sk';
+    const SANDBOX_URL               = 'https://sandbox.superfaktura.sk';
 
     public function __construct()
     {
@@ -57,7 +60,7 @@ class SuperFaktura extends Module
         $this->need_instance = 1;
 
 
-        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID', 'SUPERFAKTURA_BANK_ID', 'SUPERFAKTURA_CANCEL_SEQUENCE_ID', 'SUPERFAKTURA_PRODUCT_SYNTETIC', 'SUPERFAKTURA_PRODUCT_ANALYTIC', 'SUPERFAKTURA_CARRIER_SYNTETIC', 'SUPERFAKTURA_CARRIER_ANALYTIC', 'SUPERFAKTURA_CALLBACK_PAYMENT', 'SUPERFAKTURA_PAYPAL', 'SUPERFAKTURA_ONLINE_PAYMENT', 'SUPERFAKTURA_UPDATE_ADDRESSBOOK'));
+        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID', 'SUPERFAKTURA_BANK_ID', 'SUPERFAKTURA_CANCEL_SEQUENCE_ID', 'SUPERFAKTURA_PRODUCT_SYNTETIC', 'SUPERFAKTURA_PRODUCT_ANALYTIC', 'SUPERFAKTURA_CARRIER_SYNTETIC', 'SUPERFAKTURA_CARRIER_ANALYTIC', 'SUPERFAKTURA_CALLBACK_PAYMENT', 'SUPERFAKTURA_PAYPAL', 'SUPERFAKTURA_ONLINE_PAYMENT', 'SUPERFAKTURA_UPDATE_ADDRESSBOOK', 'SUPERFAKTURA_USE_SANDBOX'));
 
         $this->email                    = isset($config['SUPERFAKTURA_EMAIL']) ? $config['SUPERFAKTURA_EMAIL'] : "";
         $this->apikey                   = isset($config['SUPERFAKTURA_APIKEY']) ? $config['SUPERFAKTURA_APIKEY'] : "";
@@ -86,6 +89,8 @@ class SuperFaktura extends Module
         $this->paypal                   = isset($config['SUPERFAKTURA_PAYPAL']) ? $config['SUPERFAKTURA_PAYPAL'] : "";
         $this->callback_payment         = isset($config['SUPERFAKTURA_CALLBACK_PAYMENT']) ? $config['SUPERFAKTURA_CALLBACK_PAYMENT'] : "";
         $this->update_addressbook       = isset($config['SUPERFAKTURA_UPDATE_ADDRESSBOOK']) ? $config['SUPERFAKTURA_UPDATE_ADDRESSBOOK'] : "";
+        $this->use_sandbox              = isset($config['SUPERFAKTURA_USE_SANDBOX']) ? $config['SUPERFAKTURA_USE_SANDBOX'] : "";
+
 
 
         parent::__construct();
@@ -158,7 +163,7 @@ class SuperFaktura extends Module
             && Configuration::deleteByName('SUPERFAKTURA_PAYPAL')
             && Configuration::deleteByName('SUPERFAKTURA_ONLINE_PAYMENT')
             && Configuration::deleteByName('SUPERFAKTURA_UPDATE_ADDRESSBOOK')
-
+            && Configuration::deleteByName('SUPERFAKTURA_USE_SANDBOX')
         );
     }
 
@@ -209,6 +214,7 @@ class SuperFaktura extends Module
                 Configuration::updateValue('SUPERFAKTURA_PAYPAL', Tools::getValue('paypal'));
                 Configuration::updateValue('SUPERFAKTURA_CALLBACK_PAYMENT', Tools::getValue('callback_payment'));
                 Configuration::updateValue('SUPERFAKTURA_UPDATE_ADDRESSBOOK', Tools::getValue('update_addressbook'));
+                Configuration::updateValue('SUPERFAKTURA_USE_SANDBOX', Tools::getValue('use_sandbox'));
 
                 $this->_html .= '<div class="conf"><img src="../img/admin/ok.gif" alt="'.$this->l('ok').'" /> '.$this->l('Nastavenia uložené').'</div>';
             }
@@ -229,6 +235,10 @@ class SuperFaktura extends Module
 
         $states = OrderState::getOrderStates((int)($cookie->id_lang));
 
+        if (!empty($this->use_sandbox)) {
+            $this->_html .= '<div style="width: 517px; margin: 10px auto; color: red; font-size; font-size: 20px;">' .  $this->l("Doklady budú vystavované na Sandboxe") . '</div>';            
+        }
+
         $this->_html .= '<div style="width: 517px; margin: 10px auto;">
             <form action="'.Tools::htmlentitiesUTF8($_SERVER['REQUEST_URI']).'" method="post">
 
@@ -242,6 +252,10 @@ class SuperFaktura extends Module
 
                 <strong>Company ID: </strong><br />
                 <input type="text" name="company_id" size="50" value="' . htmlentities(Tools::getValue('company_id', $this->company_id), ENT_COMPAT, 'UTF-8') . '" /><br />
+                <br />
+
+                <input type="checkbox" name="use_sandbox" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('use_sandbox', $this->use_sandbox) ? ' checked="checked"' : '') . ' />
+                <strong>' . $this->l("Vystavovať doklady na Sandboxe") . '</strong><br /><br />
                 <br />
 
                 <strong>' . $this->l("Faktúru vytvárať pri") . ': <sup>*</sup></strong><br />
@@ -853,9 +867,7 @@ class SuperFaktura extends Module
             }
         }
 
-
-        $response = $this->_request(self::SF_URL_CREATE_INVOICE, array('data' => json_encode($data)));
-        
+        $response = $this->_request($this->getSfUrl(self::SF_URL_CREATE_INVOICE), array('data' => json_encode($data)));
         $response = json_decode($response);
         
         if (false == $response)
@@ -870,7 +882,7 @@ class SuperFaktura extends Module
                 'to'  => $response->data->Client->email,
             );
 
-            $send = $this->_request(self::SF_URL_SEND_INVOICE, array('data' => json_encode($request_data)));
+            $send = $this->_request($this->getSfUrl(self::SF_URL_SEND_INVOICE), array('data' => json_encode($request_data)));
 
         }
 
@@ -914,7 +926,7 @@ class SuperFaktura extends Module
                 'created'      => date('Y-m-d')
             );
 
-            $response = $this->_request(self::SF_URL_PAY_INVOICE . $params['id_order'], array('data' => json_encode($data)));
+            $response = $this->_request($this->getSfUrl(self::SF_URL_PAY_INVOICE . $params['id_order']), array('data' => json_encode($data)));
         }
     }
 
@@ -923,7 +935,7 @@ class SuperFaktura extends Module
     {
         if (intval($this->id_order_state_refund) == intval($params['newOrderStatus']->id))
         {      
-            $response = $this->_request(self::SF_URL_CREATE_CANCEL . $params['id_order'] . (!empty($this->cancel_sequence_id) ? '/sequence_id:' . $this->cancel_sequence_id : ''));
+            $response = $this->_request($this->getSfUrl(self::SF_URL_CREATE_CANCEL . $params['id_order'] . (!empty($this->cancel_sequence_id) ? '/sequence_id:' . $this->cancel_sequence_id : '')));
         }
         elseif ($this->id_order_state_invoice == $params['newOrderStatus']->id)
         {
@@ -932,5 +944,17 @@ class SuperFaktura extends Module
 
             $this->_createInvoice($order, $cart);
         }
+    }
+
+    /**
+     * Get url
+     * 
+     * @param string $url
+     * 
+     * @return string
+     * */
+    public function getSfUrl(string $url): string
+    {
+        return ($this->use_sandbox == 1 ? self::SANDBOX_URL : self::SF_URL) . $url;
     }
 }
