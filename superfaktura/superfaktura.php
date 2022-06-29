@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.7.4
-*   Last modified 2022-06-24
+*   Version 1.7.5
+*   Last modified 2022-06-29
 */
 
 class SuperFaktura extends Module
@@ -39,7 +39,8 @@ class SuperFaktura extends Module
         $paypal,
         $online_payment,
         $update_addressbook,
-        $use_sandbox;
+        $use_sandbox,
+        $add_rounding;
 
     const API_AUTH_KEYWORD          = 'SFAPI';
     const SF_URL_CREATE_INVOICE     = '/invoices/create';
@@ -55,12 +56,12 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.7.4';
+        $this->version       = '1.7.5';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
 
-        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID', 'SUPERFAKTURA_BANK_ID', 'SUPERFAKTURA_CANCEL_SEQUENCE_ID', 'SUPERFAKTURA_PRODUCT_SYNTETIC', 'SUPERFAKTURA_PRODUCT_ANALYTIC', 'SUPERFAKTURA_CARRIER_SYNTETIC', 'SUPERFAKTURA_CARRIER_ANALYTIC', 'SUPERFAKTURA_CALLBACK_PAYMENT', 'SUPERFAKTURA_PAYPAL', 'SUPERFAKTURA_ONLINE_PAYMENT', 'SUPERFAKTURA_UPDATE_ADDRESSBOOK', 'SUPERFAKTURA_USE_SANDBOX'));
+        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID', 'SUPERFAKTURA_BANK_ID', 'SUPERFAKTURA_CANCEL_SEQUENCE_ID', 'SUPERFAKTURA_PRODUCT_SYNTETIC', 'SUPERFAKTURA_PRODUCT_ANALYTIC', 'SUPERFAKTURA_CARRIER_SYNTETIC', 'SUPERFAKTURA_CARRIER_ANALYTIC', 'SUPERFAKTURA_CALLBACK_PAYMENT', 'SUPERFAKTURA_PAYPAL', 'SUPERFAKTURA_ONLINE_PAYMENT', 'SUPERFAKTURA_UPDATE_ADDRESSBOOK', 'SUPERFAKTURA_USE_SANDBOX', 'SUPERFAKTURA_ADD_ROUNDING'));
 
         $this->email                    = isset($config['SUPERFAKTURA_EMAIL']) ? $config['SUPERFAKTURA_EMAIL'] : "";
         $this->apikey                   = isset($config['SUPERFAKTURA_APIKEY']) ? $config['SUPERFAKTURA_APIKEY'] : "";
@@ -90,8 +91,7 @@ class SuperFaktura extends Module
         $this->callback_payment         = isset($config['SUPERFAKTURA_CALLBACK_PAYMENT']) ? $config['SUPERFAKTURA_CALLBACK_PAYMENT'] : "";
         $this->update_addressbook       = isset($config['SUPERFAKTURA_UPDATE_ADDRESSBOOK']) ? $config['SUPERFAKTURA_UPDATE_ADDRESSBOOK'] : "";
         $this->use_sandbox              = isset($config['SUPERFAKTURA_USE_SANDBOX']) ? $config['SUPERFAKTURA_USE_SANDBOX'] : "";
-
-
+        $this->add_rounding             = isset($config['SUPERFAKTURA_ADD_ROUNDING']) ? $config['SUPERFAKTURA_ADD_ROUNDING'] : "";
 
         parent::__construct();
 
@@ -164,6 +164,7 @@ class SuperFaktura extends Module
             && Configuration::deleteByName('SUPERFAKTURA_ONLINE_PAYMENT')
             && Configuration::deleteByName('SUPERFAKTURA_UPDATE_ADDRESSBOOK')
             && Configuration::deleteByName('SUPERFAKTURA_USE_SANDBOX')
+            && Configuration::deleteByName('SUPERFAKTURA_ADD_ROUNDING')
         );
     }
 
@@ -215,6 +216,7 @@ class SuperFaktura extends Module
                 Configuration::updateValue('SUPERFAKTURA_CALLBACK_PAYMENT', Tools::getValue('callback_payment'));
                 Configuration::updateValue('SUPERFAKTURA_UPDATE_ADDRESSBOOK', Tools::getValue('update_addressbook'));
                 Configuration::updateValue('SUPERFAKTURA_USE_SANDBOX', Tools::getValue('use_sandbox'));
+                Configuration::updateValue('SUPERFAKTURA_ADD_ROUNDING', Tools::getValue('add_rounding'));
 
                 $this->_html .= '<div class="conf"><img src="../img/admin/ok.gif" alt="'.$this->l('ok').'" /> '.$this->l('Nastavenia uložené').'</div>';
             }
@@ -256,7 +258,6 @@ class SuperFaktura extends Module
 
                 <input type="checkbox" name="use_sandbox" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('use_sandbox', $this->use_sandbox) ? ' checked="checked"' : '') . ' />
                 <strong>' . $this->l("Vystavovať doklady na Sandboxe") . '</strong><br /><br />
-                <br />
 
                 <strong>' . $this->l("Faktúru vytvárať pri") . ': <sup>*</sup></strong><br />
                 <select name="id_order_state_invoice">
@@ -271,8 +272,10 @@ class SuperFaktura extends Module
                 <br />
 
                 <input type="checkbox" name="set_invoice_paid" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('set_invoice_paid', $this->set_invoice_paid) ? ' checked="checked"' : '') . ' />
-                <strong>' . $this->l("Pri vytvorení faktúry ju nastaviť ako uhradenú") . ': </strong><br /><br />
+                <strong>' . $this->l("Pri vytvorení faktúry ju nastaviť ako uhradenú") . '</strong>
                 <br />
+                <input type="checkbox" name="add_rounding" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('add_rounding', $this->set_invoice_paid) ? ' checked="checked"' : '') . ' />
+                <strong>' . $this->l("Pridať centové / halierové vyrovnanie pre platbu v hotovosti") . '</strong><br /><br />
 
                 <strong>' . $this->l("Stav objednávky pre vytvorenie dobropisu") . ': <sup>*</sup></strong><br />
                 <select name="id_order_state_refund">
@@ -804,6 +807,10 @@ class SuperFaktura extends Module
             );
         }
 
+        if (!empty($this->add_rounding) && $this->isCodPayment($order->payment)) {
+            $data['Invoice']['add_rounding_item'] = true;
+        }
+
         $data['InvoiceSetting']['settings'] = json_encode(array(
             'language'         => $this->invoice_language,
             'signature'        => true,
@@ -956,5 +963,20 @@ class SuperFaktura extends Module
     public function getSfUrl(string $url): string
     {
         return ($this->use_sandbox == 1 ? self::SANDBOX_URL : self::SF_URL) . $url;
+    }
+
+    /**
+     * Is COD payment
+     * 
+     * @param string $payment
+     * 
+     * @return bool
+     * */
+    public function isCodPayment(string $payment = ''): bool
+    {
+        return (
+            $payment === 'Cash on delivery'
+                || strpos($payment, 'dobier') !== false
+        );
     }
 }
