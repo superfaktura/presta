@@ -976,7 +976,7 @@ class SuperFaktura extends Module
     {
         return (
             $payment === 'Cash on delivery'
-                || strpos($payment, 'dobier') !== false
+                || strpos(strtolower($payment), 'dobier') !== false
         );
     }
 }
