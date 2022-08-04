@@ -4,8 +4,8 @@ if ( !defined( '_PS_VERSION_' ) )
     exit;
 
 /**
-*   Version 1.7.5
-*   Last modified 2022-06-29
+*   Version 1.7.6
+*   Last modified 2022-08-04
 */
 
 class SuperFaktura extends Module
