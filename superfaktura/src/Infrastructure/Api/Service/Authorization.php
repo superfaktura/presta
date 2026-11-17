@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SuperFaktura\PrestaShop\Infrastructure\Api\Security;
+namespace SuperFaktura\PrestaShop\Infrastructure\Api\Service;
 
 use SensitiveParameter;
 
