@@ -6,6 +6,7 @@ namespace SuperFaktura\PrestaShop\Infrastructure\Api\Service;
 
 use RuntimeException;
 use SensitiveParameter;
+use SuperFaktura\PrestaShop\Application\Exception\SuperFakturaTransportException;
 use SuperFaktura\PrestaShop\Infrastructure\Api\HttpResponse;
 use SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\ClientInterface;
 
@@ -71,7 +72,7 @@ final readonly class CurlClient implements ClientInterface
         $responseBody = curl_exec($handle);
 
         if (!is_string($responseBody)) {
-            throw new RuntimeException('SuperFaktura request failed.', curl_errno($handle));
+            throw new SuperFakturaTransportException('SuperFaktura request failed.', curl_errno($handle));
         }
 
         return new HttpResponse(
