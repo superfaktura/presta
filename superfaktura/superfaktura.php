@@ -460,6 +460,19 @@ class SuperFaktura extends Module
         return $result[count($result) - 1];
     }
 
+    private function createPeppolInvoiceGateway(): \SuperFaktura\PrestaShop\Application\Contract\PeppolInvoiceGatewayInterface
+    {
+        require_once __DIR__ . '/autoload.php';
+
+        return (new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\PeppolInvoiceGatewayFactory())->create(
+            (string) $this->email,
+            (string) $this->apikey,
+            (string) $this->company_id,
+            'PrestaShop ' . $this->version,
+            1 == $this->use_sandbox,
+        );
+    }
+
 
 
     private function _createInvoice($order, $cart)
