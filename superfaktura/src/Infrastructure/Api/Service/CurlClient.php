@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
-namespace SuperFaktura\PrestaShop\Infrastructure\SuperFaktura;
+namespace SuperFaktura\PrestaShop\Infrastructure\Api\Service;
 
 use RuntimeException;
 use SensitiveParameter;
 use SuperFaktura\PrestaShop\Infrastructure\Api\HttpResponse;
+use SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\ClientInterface;
 
 final readonly class CurlClient implements ClientInterface
 {
+    private const PRODUCTION_BASE_URL = 'https://moja.superfaktura.sk';
+    private const SANDBOX_BASE_URL = 'https://sandbox.superfaktura.sk';
+
     private string $baseUrl;
 
     public function __construct(
@@ -18,8 +22,8 @@ final readonly class CurlClient implements ClientInterface
         private string $authorizationHeader,
     ) {
         $this->baseUrl = $useSandbox
-            ? 'https://sandbox.superfaktura.sk'
-            : 'https://moja.superfaktura.sk';
+            ? self::SANDBOX_BASE_URL
+            : self::PRODUCTION_BASE_URL;
     }
 
     public function get(string $path): HttpResponse
