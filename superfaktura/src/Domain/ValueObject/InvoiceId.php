@@ -6,7 +6,7 @@ namespace SuperFaktura\PrestaShop\Domain\ValueObject;
 
 use InvalidArgumentException;
 
-final readonly class SuperFakturaInvoiceId
+final readonly class InvoiceId
 {
     public function __construct(public int $value)
     {
