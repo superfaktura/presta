@@ -10,16 +10,16 @@ final readonly class OrderInvoiceTable
 {
     public const NAME = 'superfaktura_order_invoice';
 
-    public function __construct(private Db $db)
+    public function __construct(private PrestaShopDb $db)
     {
     }
 
     public function create(): bool
     {
-        $table = _DB_PREFIX_ . self::NAME;
+        $table = $this->db->table(self::NAME);
 
         return $this->db->execute(<<<SQL
-            CREATE TABLE IF NOT EXISTS `{$table}` (
+            CREATE TABLE IF NOT EXISTS {$table} (
                 id_shop INT UNSIGNED NOT NULL,
                 id_order INT UNSIGNED NOT NULL,
                 use_sandbox TINYINT UNSIGNED NOT NULL,

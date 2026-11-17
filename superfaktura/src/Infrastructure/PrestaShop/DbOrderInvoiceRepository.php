@@ -15,7 +15,7 @@ use UnexpectedValueException;
 
 final readonly class DbOrderInvoiceRepository implements OrderInvoiceRepositoryInterface
 {
-    public function __construct(private Db $db)
+    public function __construct(private PrestaShopDb $db)
     {
     }
 
@@ -25,9 +25,9 @@ final readonly class DbOrderInvoiceRepository implements OrderInvoiceRepositoryI
             throw new InvalidArgumentException('A positive SuperFaktura company ID is required.');
         }
 
-        $table = _DB_PREFIX_ . OrderInvoiceTable::NAME;
+        $table = $this->db->table(OrderInvoiceTable::NAME);
         $sql = sprintf(
-            'INSERT INTO `%s` (id_shop, id_order, use_sandbox, sf_company_id, sf_invoice_id)
+            'INSERT INTO %s (id_shop, id_order, use_sandbox, sf_company_id, sf_invoice_id)
              VALUES (%d, %d, %d, %d, %d)
              ON DUPLICATE KEY UPDATE sf_invoice_id = sf_invoice_id',
             $table,
@@ -46,10 +46,10 @@ final readonly class DbOrderInvoiceRepository implements OrderInvoiceRepositoryI
     /** @return iterable<int, CreatedInvoice> */
     public function findByOrder(OrderReference $order): iterable
     {
-        $table = _DB_PREFIX_ . OrderInvoiceTable::NAME;
+        $table = $this->db->table(OrderInvoiceTable::NAME);
         $sql = sprintf(
             'SELECT use_sandbox, sf_company_id, sf_invoice_id
-             FROM `%s`
+              FROM %s
              WHERE id_shop = %d AND id_order = %d
              ORDER BY use_sandbox, sf_company_id, sf_invoice_id',
             $table,
@@ -57,7 +57,7 @@ final readonly class DbOrderInvoiceRepository implements OrderInvoiceRepositoryI
             $order->orderId,
         );
 
-        $rows = $this->db->executeS($sql, true, false);
+        $rows = $this->db->fetchAll($sql);
 
         if (false === $rows) {
             throw new RuntimeException('Unable to load the SuperFaktura invoice references.');
