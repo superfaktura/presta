@@ -40,7 +40,8 @@ class SuperFaktura extends Module
         $online_payment,
         $update_addressbook,
         $use_sandbox,
-        $add_rounding;
+        $add_rounding,
+        $set_invoice_paid;
 
     const API_AUTH_KEYWORD          = 'SFAPI';
     const SF_URL_CREATE_INVOICE     = '/invoices/create';
@@ -94,6 +95,7 @@ class SuperFaktura extends Module
         $this->add_rounding             = isset($config['SUPERFAKTURA_ADD_ROUNDING']) ? $config['SUPERFAKTURA_ADD_ROUNDING'] : "";
 
         parent::__construct();
+        $this->loadModuleConfiguration();
 
 
         $this->displayName = $this->l( 'SuperFaktura' );
@@ -150,93 +152,72 @@ class SuperFaktura extends Module
 
     public function uninstall()
     {
-        return (
-            parent::uninstall()
-            && Configuration::deleteByName('SUPERFAKTURA_EMAIL')
-            && Configuration::deleteByName('SUPERFAKTURA_APIKEY')
-            && Configuration::deleteByName('SUPERFAKTURA_COMPANY_ID')
-            && Configuration::deleteByName('SUPERFAKTURA_SEQUENCE_ID')
-            && Configuration::deleteByName('SUPERFAKTURA_ORDER_STATE_REFUND')
-            && Configuration::deleteByName('SUPERFAKTURA_SET_INVOICE_PAID')
-            && Configuration::deleteByName('SUPERFAKTURA_VARIABLE_SOURCE')
-            && Configuration::deleteByName('SUPERFAKTURA_INVOICE_TYPE')
-            && Configuration::deleteByName('SUPERFAKTURA_INVOICE_LANGUAGE')
-            && Configuration::deleteByName('SUPERFAKTURA_ISSUED_BY')
-            && Configuration::deleteByName('SUPERFAKTURA_ISSUED_BY_PHONE')
-            && Configuration::deleteByName('SUPERFAKTURA_ISSUED_BY_WEB')
-            && Configuration::deleteByName('SUPERFAKTURA_ISSUED_BY_EMAIL')
-            && Configuration::deleteByName('SUPERFAKTURA_BY_SQUARE')
-            && Configuration::deleteByName('SUPERFAKTURA_LOGO_ID')
-            && Configuration::deleteByName('SUPERFAKTURA_BANK_ID')
-            && Configuration::deleteByName('SUPERFAKTURA_CANCEL_SEQUENCE_ID')
-            && Configuration::deleteByName('SUPERFAKTURA_PRODUCT_SYNTETIC')
-            && Configuration::deleteByName('SUPERFAKTURA_PRODUCT_ANALYTIC')
-            && Configuration::deleteByName('SUPERFAKTURA_CARRIER_SYNTETIC')
-            && Configuration::deleteByName('SUPERFAKTURA_CARRIER_ANALYTIC')
-            && Configuration::deleteByName('SUPERFAKTURA_CALLBACK_PAYMENT')
-            && Configuration::deleteByName('SUPERFAKTURA_PAYPAL')
-            && Configuration::deleteByName('SUPERFAKTURA_ONLINE_PAYMENT')
-            && Configuration::deleteByName('SUPERFAKTURA_UPDATE_ADDRESSBOOK')
-            && Configuration::deleteByName('SUPERFAKTURA_USE_SANDBOX')
-            && Configuration::deleteByName('SUPERFAKTURA_ADD_ROUNDING')
-        );
+        require_once __DIR__ . '/autoload.php';
+
+        if (!parent::uninstall()) {
+            return false;
+        }
+
+        try {
+            return (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleConfigurationStore())
+                ->deleteAll();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function getContent()
     {
-        $this->_html = '<h2>'.$this->displayName.'</h2>';
+        require_once __DIR__ . '/autoload.php';
 
-        if (Tools::isSubmit('btnSubmit'))
-        {
-            $errors = array();
+        $this->_html = '<h2>' . $this->displayName . '</h2>';
+        $currentValues = $this->loadModuleConfiguration();
 
-            if (!Tools::getValue('email'))
-                $errors[] = $this->l('E-mail musí byť vyplnený.');
+        if (Tools::isSubmit('btnSubmit')) {
+            try {
+                $values = (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleConfigurationForm())
+                    ->read($currentValues);
+            } catch (\InvalidArgumentException) {
+                $this->_html .= '<div class="error">'
+                                . $this->l('Nastavenia obsahujú neplatné hodnoty.')
+                                . '</div>';
 
-            if (!Tools::getValue('apikey'))
-                $errors[] = $this->l('API key musí byť vyplnené.');
-
-            if (0 == Tools::getValue('id_order_state_refund'))
-                $this->warning .= $this->l('Stav objednávky pre vytvorenie dobropisu musí byť vyplnený');
-
-
-            if (empty($errors))
-            {
-                Configuration::updateValue('SUPERFAKTURA_EMAIL', Tools::getValue('email'));
-                Configuration::updateValue('SUPERFAKTURA_APIKEY', Tools::getValue('apikey'));
-                Configuration::updateValue('SUPERFAKTURA_COMPANY_ID', Tools::getValue('company_id'));
-                Configuration::updateValue('SUPERFAKTURA_ORDER_STATE_INVOICE', Tools::getValue('id_order_state_invoice'));
-                Configuration::updateValue('SUPERFAKTURA_ORDER_STATE_REFUND', Tools::getValue('id_order_state_refund'));
-                Configuration::updateValue('SUPERFAKTURA_SET_INVOICE_PAID', (int)Tools::getValue('set_invoice_paid'));
-                Configuration::updateValue('SUPERFAKTURA_VARIABLE_SOURCE', Tools::getValue('variable_source'));
-                Configuration::updateValue('SUPERFAKTURA_SEQUENCE_ID', Tools::getValue('sequence_id'));
-                Configuration::updateValue('SUPERFAKTURA_SEND_INVOICE', Tools::getValue('send_invoice'));
-                Configuration::updateValue('SUPERFAKTURA_INVOICE_TYPE', Tools::getValue('invoice_type'));
-                Configuration::updateValue('SUPERFAKTURA_INVOICE_LANGUAGE', Tools::getValue('invoice_language'));
-                Configuration::updateValue('SUPERFAKTURA_ISSUED_BY', Tools::getValue('issued_by'));
-                Configuration::updateValue('SUPERFAKTURA_ISSUED_BY_PHONE', Tools::getValue('issued_by_phone'));
-                Configuration::updateValue('SUPERFAKTURA_ISSUED_BY_WEB', Tools::getValue('issued_by_web'));
-                Configuration::updateValue('SUPERFAKTURA_ISSUED_BY_EMAIL', Tools::getValue('issued_by_email')); 
-                Configuration::updateValue('SUPERFAKTURA_BY_SQUARE', Tools::getValue('by_square'));
-                Configuration::updateValue('SUPERFAKTURA_LOGO_ID', Tools::getValue('logo_id'));
-                Configuration::updateValue('SUPERFAKTURA_BANK_ID', Tools::getValue('bank_id'));
-                Configuration::updateValue('SUPERFAKTURA_CANCEL_SEQUENCE_ID', Tools::getValue('cancel_sequence_id'));
-                Configuration::updateValue('SUPERFAKTURA_PRODUCT_SYNTETIC', Tools::getValue('product_syntetic'));
-                Configuration::updateValue('SUPERFAKTURA_PRODUCT_ANALYTIC', Tools::getValue('product_analytic'));
-                Configuration::updateValue('SUPERFAKTURA_CARRIER_SYNTETIC', Tools::getValue('carrier_syntetic'));
-                Configuration::updateValue('SUPERFAKTURA_CARRIER_ANALYTIC', Tools::getValue('carrier_analytic'));
-                Configuration::updateValue('SUPERFAKTURA_ONLINE_PAYMENT', Tools::getValue('online_payment'));
-                Configuration::updateValue('SUPERFAKTURA_PAYPAL', Tools::getValue('paypal'));
-                Configuration::updateValue('SUPERFAKTURA_CALLBACK_PAYMENT', Tools::getValue('callback_payment'));
-                Configuration::updateValue('SUPERFAKTURA_UPDATE_ADDRESSBOOK', Tools::getValue('update_addressbook'));
-                Configuration::updateValue('SUPERFAKTURA_USE_SANDBOX', Tools::getValue('use_sandbox'));
-                Configuration::updateValue('SUPERFAKTURA_ADD_ROUNDING', Tools::getValue('add_rounding'));
-
-                $this->_html .= '<div class="conf"><img src="../img/admin/ok.gif" alt="'.$this->l('ok').'" /> '.$this->l('Nastavenia uložené').'</div>';
+                return $this->_html;
             }
-            else
-            {
-                $this->_html .= '<div class="error"><img src="../img/admin/error2.png" alt="'.$this->l('chyba').'" /> '. implode('<br />', $errors) .'</div>';
+
+            $errors = [];
+
+            if ('' === trim((string) $values['email'])) {
+                $errors[] = $this->l('E-mail musí byť vyplnený.');
+            }
+
+            if ('' === trim((string) $values['apikey'])) {
+                $errors[] = $this->l('API key musí byť vyplnené.');
+            }
+
+            if (0 == $values['id_order_state_refund']) {
+                $this->warning .= $this->l('Stav objednávky pre vytvorenie dobropisu musí byť vyplnený');
+            }
+
+            if ([] === $errors) {
+                try {
+                    (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleConfigurationStore())
+                        ->save($values);
+
+                    $this->loadModuleConfiguration();
+
+                    $this->_html .= '<div class="conf">'
+                                    . $this->l('Nastavenia uložené')
+                                    . '</div>';
+                } catch (\Throwable) {
+                    $errors[] = $this->l('Nastavenia sa nepodarilo uložiť.');
+                }
+            }
+
+            if ([] !== $errors) {
+                $this->_html .= '<div class="error">'
+                                . implode('<br />', $errors)
+                                . '</div>';
             }
         }
 
@@ -288,7 +269,7 @@ class SuperFaktura extends Module
                 <input type="checkbox" name="set_invoice_paid" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('set_invoice_paid', $this->set_invoice_paid) ? ' checked="checked"' : '') . ' />
                 <strong>' . $this->l("Pri vytvorení faktúry ju nastaviť ako uhradenú") . '</strong>
                 <br />
-                <input type="checkbox" name="add_rounding" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('add_rounding', $this->set_invoice_paid) ? ' checked="checked"' : '') . ' />
+                <input type="checkbox" name="add_rounding" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('add_rounding', $this->add_rounding) ? ' checked="checked"' : '') . ' />
                 <strong>' . $this->l("Pridať centové / halierové vyrovnanie pre platbu v hotovosti") . '</strong><br /><br />
 
                 <strong>' . $this->l("Stav objednávky pre vytvorenie dobropisu") . ': <sup>*</sup></strong><br />
@@ -342,20 +323,20 @@ class SuperFaktura extends Module
                 <select name="invoice_language">
         ';
 
-        $this->_html .= '<option value="slo"'.('slo' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Slovenčina").'</option>';
-        $this->_html .= '<option value="cze"'.('cze' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Čeština").'</option>';
-        $this->_html .= '<option value="eng"'.('eng' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Angličtina").'</option>';
-        $this->_html .= '<option value="deu"'.('deu' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Nemčina").'</option>';
-        $this->_html .= '<option value="rus"'.('rus' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Ruština").'</option>';
-        $this->_html .= '<option value="ukr"'.('ukr' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Ukrajinčina").'</option>';
-        $this->_html .= '<option value="hun"'.('hun' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Maďarčina").'</option>';
-        $this->_html .= '<option value="pol"'.('pol' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Poľština").'</option>';
-        $this->_html .= '<option value="rom"'.('rom' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Rumunčina").'</option>';
-        $this->_html .= '<option value="hrv"'.('hrv' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Chorvátčina").'</option>';
-        $this->_html .= '<option value="slv"'.('slv' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Slovinčina").'</option>';
-        $this->_html .= '<option value="spa"'.('spa' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Španielčina").'</option>';
-        $this->_html .= '<option value="ita"'.('ita' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Taliančina").'</option>';
-        $this->_html .= '<option value="nld"'.('nld' == Tools::getValue('invoice_language', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Holandčina").'</option>';
+        $this->_html .= '<option value="slo"'.('slo' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Slovenčina").'</option>';
+        $this->_html .= '<option value="cze"'.('cze' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Čeština").'</option>';
+        $this->_html .= '<option value="eng"'.('eng' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Angličtina").'</option>';
+        $this->_html .= '<option value="deu"'.('deu' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Nemčina").'</option>';
+        $this->_html .= '<option value="rus"'.('rus' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Ruština").'</option>';
+        $this->_html .= '<option value="ukr"'.('ukr' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Ukrajinčina").'</option>';
+        $this->_html .= '<option value="hun"'.('hun' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Maďarčina").'</option>';
+        $this->_html .= '<option value="pol"'.('pol' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Poľština").'</option>';
+        $this->_html .= '<option value="rom"'.('rom' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Rumunčina").'</option>';
+        $this->_html .= '<option value="hrv"'.('hrv' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Chorvátčina").'</option>';
+        $this->_html .= '<option value="slv"'.('slv' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Slovinčina").'</option>';
+        $this->_html .= '<option value="spa"'.('spa' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Španielčina").'</option>';
+        $this->_html .= '<option value="ita"'.('ita' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Taliančina").'</option>';
+        $this->_html .= '<option value="nld"'.('nld' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Holandčina").'</option>';
         $this->_html .= '
                 </select><br /><br />';
         
@@ -437,6 +418,49 @@ class SuperFaktura extends Module
         );
     }
 
+    /** @return array<string, string|int|bool> */
+    private function loadModuleConfiguration(?Order $order = null): array
+    {
+        require_once __DIR__ . '/autoload.php';
+
+        $store = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleConfigurationStore();
+        $values = null === $order
+            ? $store->load()
+            : $store->loadForShop((int) $order->id_shop);
+
+        foreach ($values as $field => $value) {
+            $this->$field = $value;
+        }
+
+        return $values;
+    }
+
+    private function loadOrderConfiguration(Order $order): bool
+    {
+        $shopId = (int) $order->id_shop;
+        $orderId = (int) $order->id;
+
+        if (0 >= $shopId || 0 >= $orderId) {
+            return false;
+        }
+
+        try {
+            $this->loadModuleConfiguration($order);
+
+            return true;
+        } catch (\Throwable $exception) {
+            $reference = new \SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference($shopId, $orderId);
+
+            (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger())->report(
+                $reference,
+                'load_configuration_failed',
+                exception: $exception,
+            );
+
+            return false;
+        }
+    }
+
     private function createInvoiceGateway(): \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\InvoiceGateway
     {
         require_once __DIR__ . '/autoload.php';
@@ -467,9 +491,25 @@ class SuperFaktura extends Module
         );
     }
 
-
-
     private function _createInvoice($order, $cart)
+    {
+        require_once __DIR__ . '/autoload.php';
+
+        if (!$this->loadOrderConfiguration($order)) {
+            return;
+        }
+
+        (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ShopContextRunner())->runForShop(
+            (int) $order->id_shop,
+            function () use ($order, $cart): void {
+                $this->_createInvoiceInShop($order, $cart);
+            },
+        );
+    }
+
+
+
+    private function _createInvoiceInShop($order, $cart)
     {
         require_once __DIR__ . '/autoload.php';
 
@@ -590,24 +630,30 @@ class SuperFaktura extends Module
 
     public function hookNewOrder($params)
     {
+        $order = $params['order'] ?? null;
 
-        if (0 != $this->id_order_state_invoice)
-            return; // faktura sa vytvara pri inom stave
+        if (!$order instanceof Order || !$this->loadOrderConfiguration($order)) {
+            return;
+        }
 
-        $this->_createInvoice($params['order'], $params['cart']);
+        if (0 != $this->id_order_state_invoice) {
+            return;
+        }
+
+        $this->_createInvoice($order, $params['cart']);
     }
 
     public function hookActionPaymentConfirmation($params)
     {
-        if (1 == $this->set_invoice_paid) {
-            return;
-        }
-
         require_once __DIR__ . '/autoload.php';
 
         $order = $this->orderFromHook($params);
 
-        if (null === $order) {
+        if (null === $order || !$this->loadOrderConfiguration($order)) {
+            return;
+        }
+
+        if (1 == $this->set_invoice_paid) {
             return;
         }
 
@@ -615,15 +661,11 @@ class SuperFaktura extends Module
             (int) $order->id_shop,
             (int) $order->id,
         );
-
         $logger = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger();
 
         try {
             $recordPayment = $this->createRecordOrderInvoicePaymentHandler();
-            $confirmed = $recordPayment(
-                $reference,
-                new \DateTimeImmutable('today'),
-            );
+            $confirmed = $recordPayment($reference, new \DateTimeImmutable('today'));
         } catch (\Throwable $exception) {
             $logger->report(
                 $reference,
@@ -660,16 +702,16 @@ class SuperFaktura extends Module
             return;
         }
 
+        $order = $this->orderFromHook($params);
+
+        if (null === $order || !$this->loadOrderConfiguration($order)) {
+            return;
+        }
+
         $isRefund = (int) $this->id_order_state_refund === $statusId;
         $isInvoice = (int) $this->id_order_state_invoice === $statusId;
 
         if (!$isRefund && !$isInvoice) {
-            return;
-        }
-
-        $order = $this->orderFromHook($params);
-
-        if (null === $order) {
             return;
         }
 
@@ -680,7 +722,6 @@ class SuperFaktura extends Module
                 (int) $order->id_shop,
                 (int) $order->id,
             );
-
             $logger = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger();
 
             try {
@@ -703,10 +744,7 @@ class SuperFaktura extends Module
             }
 
             if (!$confirmed) {
-                $logger->report(
-                    $reference,
-                    'credit_note_creation_unconfirmed',
-                );
+                $logger->report($reference, 'credit_note_creation_unconfirmed');
             }
 
             return;
