@@ -23,4 +23,14 @@ final readonly class PeppolInvoiceStatus
         public ?DateTimeImmutable $completedAt,
     ) {
     }
+
+    public function isFinal(): bool
+    {
+        return PeppolSendStatus::FAILED === $this->status
+               || in_array(
+                   $this->providerStatus,
+                   ['accepted', 'rejected', 'failed_delivery'],
+                   true,
+               );
+    }
 }

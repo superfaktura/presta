@@ -19,6 +19,10 @@ use SuperFaktura\PrestaShop\Application\Handler\PollPeppolInvoiceStatusHandler;
 use SuperFaktura\PrestaShop\Domain\ValueObject\InvoiceId;
 use SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference;
 use SuperFaktura\PrestaShop\Domain\ValueObject\PeppolOperationId;
+use SuperFaktura\PrestaShop\Application\Dto\OrderInvoicePeppolState;
+use SuperFaktura\PrestaShop\Application\Enum\PeppolStatusPollOutcome;
+use SuperFaktura\PrestaShop\Infrastructure\Api\Service\JsonParser;
+use SuperFaktura\PrestaShop\Infrastructure\Service\PeppolPayloadMapper;
 
 final readonly class DbPeppolStatusRepository implements PeppolStatusTrackingRepositoryInterface
 {
@@ -133,6 +137,172 @@ final readonly class DbPeppolStatusRepository implements PeppolStatusTrackingRep
         }
 
         return $jobs;
+    }
+
+    /** @return list<OrderInvoicePeppolState> */
+    public function findByOrder(OrderReference $order): array
+    {
+        $rows = $this->db->fetchAll(sprintf(
+            'SELECT i.use_sandbox, i.sf_company_id, i.sf_invoice_id,
+                s.generation, s.operation_id, s.attempt_count, s.status_payload,
+                s.checked_at, s.next_poll_at, s.poll_outcome, s.last_error
+         FROM %s i LEFT JOIN %s s
+           ON s.id_shop = i.id_shop AND s.id_order = i.id_order
+          AND s.use_sandbox = i.use_sandbox AND s.sf_company_id = i.sf_company_id
+          AND s.sf_invoice_id = i.sf_invoice_id
+         WHERE i.id_shop = %d AND i.id_order = %d
+         ORDER BY i.use_sandbox, i.sf_company_id, i.sf_invoice_id',
+            $this->db->table(OrderInvoiceTable::NAME),
+            $this->db->table(PeppolStatusTable::NAME),
+            $order->shopId,
+            $order->orderId,
+        ));
+
+        if (false === $rows) {
+            throw new RuntimeException('Unable to load order invoice Peppol states.');
+        }
+
+        $states = [];
+
+        foreach ($rows as $row) {
+            $invoice = new CreatedInvoice(
+                new InvoiceId((int) $row['sf_invoice_id']),
+                (int) $row['sf_company_id'],
+                1 === (int) $row['use_sandbox'],
+            );
+            $status = null;
+
+            if (is_string($row['status_payload'])) {
+                $data = (new JsonParser())->parse($row['status_payload']);
+
+                if (null === $data) {
+                    throw new RuntimeException('Invalid stored Peppol status snapshot.');
+                }
+
+                $status = (new PeppolPayloadMapper())->statusResponse(
+                    $invoice->invoiceId,
+                    200,
+                    (object) ['error' => 0, 'data' => $data],
+                );
+            }
+
+            $job = is_string($row['generation'])
+                ? new PeppolStatusJob(
+                    $order,
+                    $invoice,
+                    $row['generation'],
+                    is_string($row['operation_id'])
+                        ? new PeppolOperationId($row['operation_id'])
+                        : null,
+                    (int) $row['attempt_count'],
+                )
+                : null;
+
+            $states[] = new OrderInvoicePeppolState(
+                $invoice,
+                $job,
+                $status,
+                $this->readDate(
+                    is_string($row['checked_at']) ? $row['checked_at'] : null,
+                ),
+                $this->readDate(
+                    is_string($row['next_poll_at']) ? $row['next_poll_at'] : null,
+                ),
+                match ($row['poll_outcome']) {
+                    null => null,
+                    'retry' => PeppolStatusPollOutcome::RETRY,
+                    'finished' => PeppolStatusPollOutcome::FINISHED,
+                    'exhausted' => PeppolStatusPollOutcome::EXHAUSTED,
+                    default => throw new RuntimeException(
+                        'Invalid stored Peppol polling outcome.',
+                    ),
+                },
+                is_string($row['last_error']) ? $row['last_error'] : null,
+            );
+        }
+
+        return $states;
+    }
+
+    public function ensureManualJob(
+        OrderReference $order,
+        CreatedInvoice $invoice,
+        DateTimeImmutable $now,
+    ): PeppolStatusJob {
+        $this->execute(sprintf(
+            'INSERT INTO %s
+            (id_shop, id_order, use_sandbox, sf_company_id, sf_invoice_id,
+             generation, attempt_count, poll_outcome, created_at, updated_at)
+         SELECT id_shop, id_order, use_sandbox, sf_company_id, sf_invoice_id,
+                %s, 0, \'finished\', %s, %s
+         FROM %s WHERE id_shop = %d AND id_order = %d AND use_sandbox = %d
+           AND sf_company_id = %d AND sf_invoice_id = %d
+         ON DUPLICATE KEY UPDATE sf_invoice_id = %s.sf_invoice_id',
+            $this->db->table(PeppolStatusTable::NAME),
+            $this->quote(bin2hex(random_bytes(16))),
+            $this->date($now),
+            $this->date($now),
+            $this->db->table(OrderInvoiceTable::NAME),
+            $order->shopId,
+            $order->orderId,
+            (int) $invoice->useSandbox,
+            $invoice->companyId,
+            $invoice->invoiceId->value,
+            $this->db->table(PeppolStatusTable::NAME),
+        ));
+
+        foreach ($this->findByOrder($order) as $state) {
+            if (
+                null !== $state->job
+                && $state->invoice->invoiceId->value === $invoice->invoiceId->value
+                && $state->invoice->companyId === $invoice->companyId
+                && $state->invoice->useSandbox === $invoice->useSandbox
+            ) {
+                return $state->job;
+            }
+        }
+
+        throw new RuntimeException('Unable to prepare manual Peppol status tracking.');
+    }
+
+    public function recordManual(
+        PeppolStatusJob $job,
+        ?PeppolInvoiceStatus $status,
+        DateTimeImmutable $now,
+        ?string $error = null,
+    ): void {
+        $assignments = 'generation = ' . $this->quote(bin2hex(random_bytes(16)))
+                       . ', checked_at = ' . $this->date($now)
+                       . ', updated_at = ' . $this->date($now)
+                       . ', last_error = ' . $this->quote($error ?? (
+            null === $status ? 'status_unavailable' : null
+            ));
+
+        if (null !== $status) {
+            $assignments .= ', operation_id = '
+                            . $this->quote($status->operationId?->value)
+                            . ', status_payload = '
+                            . $this->quote($this->payload($status));
+
+            if ($status->isFinal()) {
+                $assignments .= ', poll_outcome = \'finished\', next_poll_at = NULL';
+            }
+        }
+
+        $this->execute(sprintf(
+            'UPDATE %s SET %s WHERE %s AND attempt_count = %d',
+            $this->db->table(PeppolStatusTable::NAME),
+            $assignments,
+            $this->where($job),
+            $job->attemptCount,
+        ));
+    }
+
+    private function readDate(?string $value): ?DateTimeImmutable
+    {
+        return null === $value
+            ? null
+            : new DateTimeImmutable($value, new DateTimeZone('UTC'));
     }
 
     public function recordPoll(

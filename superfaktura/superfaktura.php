@@ -58,7 +58,7 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.7.7';
+        $this->version       = '1.7.8';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
@@ -132,6 +132,7 @@ class SuperFaktura extends Module
         return parent::install()
                && $this->installOrderInvoiceStorage()
                && $this->installPeppolStatusStorage()
+               && $this->installPeppolAdminUi()
                && $this->registerHook('newOrder')
                && $this->registerHook('actionPaymentConfirmation')
                && $this->registerHook('actionOrderStatusUpdate')
@@ -165,6 +166,19 @@ class SuperFaktura extends Module
         }
     }
 
+    public function installPeppolAdminUi(): bool
+    {
+        require_once __DIR__ . '/autoload.php';
+
+        try {
+            return (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PeppolAdminTab())
+                       ->install((string) $this->name)
+                   && $this->registerHook('displayAdminOrder');
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function uninstall()
     {
         require_once __DIR__ . '/autoload.php';
@@ -174,8 +188,10 @@ class SuperFaktura extends Module
         }
 
         try {
-            return (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleConfigurationStore())
-                ->deleteAll();
+            return (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PeppolAdminTab())
+                       ->uninstall((string) $this->name)
+                   && (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleConfigurationStore())
+                       ->deleteAll();
         } catch (\Throwable) {
             return false;
         }
@@ -242,6 +258,133 @@ class SuperFaktura extends Module
         $this->_displayForm($formValues);
 
         return $this->_html;
+    }
+
+    /** @param array{id_order?: int|string} $params */
+    public function hookDisplayAdminOrder($params): string
+    {
+        require_once __DIR__ . '/autoload.php';
+
+        $value = $params['id_order'] ?? null;
+
+        if (!is_string($value) && !is_int($value)) {
+            return '';
+        }
+
+        $orderId = filter_var(
+            $value,
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1]],
+        );
+
+        if (false === $orderId) {
+            return '';
+        }
+
+        $labels = $this->peppolAdminLabels();
+
+        try {
+            $factory = $this->createServiceFactory();
+            $access = $factory->createAdminPeppolAccess((int) $this->id);
+            $order = $access->loadOrder($orderId);
+
+            if (null === $order) {
+                return '';
+            }
+
+            $reference = new \SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference(
+                (int) $order->id_shop,
+                $orderId,
+            );
+            $states = $factory->createPeppolStatusRepository()->findByOrder($reference);
+
+            if ([] === $states) {
+                return '';
+            }
+
+            $context = \Context::getContext();
+            $key = 'sf_peppol_result_' . $orderId;
+            $raw = $context->cookie->{$key} ?? null;
+            unset($context->cookie->{$key});
+
+            $notice = is_string($raw)
+                ? \SuperFaktura\PrestaShop\Application\Enum\ManualPeppolStatusRefreshOutcome::tryFrom($raw)
+                : null;
+
+            return (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderPeppolPanelRenderer())->render(
+                $reference,
+                $states,
+                $context->link->getAdminLink(
+                    \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\AdminPeppolAccess::CONTROLLER,
+                    true,
+                ),
+                \Tools::getAdminTokenLite(
+                    \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\AdminPeppolAccess::CONTROLLER,
+                ),
+                $access->canRefresh(),
+                $labels,
+                $notice,
+                new \DateTimeZone(date_default_timezone_get()),
+            );
+        } catch (\Throwable $exception) {
+            error_log(sprintf(
+                'SuperFaktura: render_peppol_panel_failed; order_id=%d; exception=%s.',
+                $orderId,
+                $exception::class,
+            ));
+
+            return '<div class="alert alert-warning">'
+                   . htmlspecialchars(
+                       $labels['panel_failed'],
+                       ENT_QUOTES | ENT_SUBSTITUTE,
+                       'UTF-8',
+                   )
+                   . '</div>';
+        }
+    }
+
+    /** @return array<string, string> */
+    public function peppolAdminLabels(): array
+    {
+        return [
+            'title' => $this->l('Peppol'),
+            'invoice' => $this->l('Faktúra'),
+            'company' => $this->l('Firma v SuperFaktúre'),
+            'production' => $this->l('Produkcia'),
+            'sandbox' => $this->l('Sandbox'),
+            'send_status' => $this->l('Stav odoslania'),
+            'provider_status' => $this->l('Stav poskytovateľa'),
+            'checked_at' => $this->l('Posledná kontrola'),
+            'next_check' => $this->l('Najbližšia automatická kontrola'),
+            'monitoring' => $this->l('Automatické kontroly'),
+            'refresh' => $this->l('Obnoviť stav'),
+            'unknown' => $this->l('Stav zatiaľ nebol overený'),
+            'none' => '—',
+            'status_queued' => $this->l('Čaká na spracovanie'),
+            'status_processing' => $this->l('Spracúva sa'),
+            'status_pending' => $this->l('Čaká na potvrdenie'),
+            'status_accepted' => $this->l('Prijaté na odoslanie'),
+            'status_failed' => $this->l('Odoslanie zlyhalo'),
+            'provider_accepted' => $this->l('Prijaté'),
+            'provider_rejected' => $this->l('Odmietnuté'),
+            'provider_failed_delivery' => $this->l('Doručenie zlyhalo'),
+            'poll_retry' => $this->l('Aktívne'),
+            'poll_finished' => $this->l('Ukončené'),
+            'poll_exhausted' => $this->l('Limit kontrol vyčerpaný'),
+            'poll_none' => $this->l('Nenaplánované'),
+            'last_check_failed' => $this->l('Posledná kontrola sa nepodarila. Zobrazený je posledný známy stav.'),
+            'status_unavailable' => $this->l('Aktuálny stav momentálne nie je dostupný.'),
+            'failure_code' => $this->l('Kód chyby'),
+            'notice_updated' => $this->l('Stav bol obnovený.'),
+            'notice_not_found' => $this->l('Pre túto faktúru zatiaľ nie je dostupný Peppol stav.'),
+            'notice_busy' => $this->l('Prebieha spracovanie. Skúste obnoviť stav neskôr.'),
+            'notice_failed' => $this->l('Stav sa nepodarilo obnoviť. Skúste to znova neskôr.'),
+            'panel_failed' => $this->l('Peppol stav momentálne nie je dostupný.'),
+            'request_invalid' => $this->l('Požiadavka nie je platná.'),
+            'access_denied' => $this->l('Na túto operáciu nemáte oprávnenie.'),
+            'post_required' => $this->l('Použite tlačidlo na obnovenie stavu pri objednávke.'),
+            'not_linked' => $this->l('Faktúra nie je prepojená s touto objednávkou.'),
+        ];
     }
 
     /** @param array<string, string|int|bool> $values */

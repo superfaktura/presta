@@ -55,8 +55,11 @@ final readonly class PollPeppolInvoiceStatusHandler
             $status = null;
         }
 
-        if (null !== $status && $this->isFinal($status)) {
-            return new PeppolStatusPollResult(PeppolStatusPollOutcome::FINISHED, $status);
+        if (null !== $status && $status->isFinal()) {
+            return new PeppolStatusPollResult(
+                PeppolStatusPollOutcome::FINISHED,
+                $status,
+            );
         }
 
         if ($this->maxAttempts === $attempt) {

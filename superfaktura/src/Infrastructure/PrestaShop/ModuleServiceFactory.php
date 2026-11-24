@@ -109,4 +109,29 @@ final readonly class ModuleServiceFactory
             $this->createInvoiceGateway($configuration),
         );
     }
+
+    public function createPeppolStatusRepository(): DbPeppolStatusRepository
+    {
+        return new DbPeppolStatusRepository(new PrestaShopDb());
+    }
+
+    public function createAdminPeppolAccess(int $moduleId): AdminPeppolAccess
+    {
+        return new AdminPeppolAccess($moduleId, new PrestaShopDb());
+    }
+
+    public function createManualPeppolStatusRefreshService(): ManualPeppolStatusRefreshService
+    {
+        return new ManualPeppolStatusRefreshService(
+            $this->createPeppolStatusRepository(),
+            new GetOrderInvoicePeppolStatusHandler(
+                new DbOrderInvoiceRepository(new PrestaShopDb()),
+                new PrestaShopPeppolInvoiceGatewayResolver(
+                    new PeppolInvoiceGatewayFactory(),
+                    'PrestaShop ' . $this->moduleVersion,
+                ),
+            ),
+            new OrderInvoiceLogger(),
+        );
+    }
 }
