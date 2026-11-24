@@ -12,7 +12,8 @@ use SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\InvoiceGateway;
 use SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\LegacyApiRequest;
 use SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\PeppolInvoiceGatewayFactory;
 use SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\SuperFakturaClientFactory;
-
+use SuperFaktura\PrestaShop\Application\Handler\GetOrderInvoicePeppolStatusHandler;
+use SuperFaktura\PrestaShop\Application\Handler\PollPeppolInvoiceStatusHandler;
 final readonly class ModuleServiceFactory
 {
     public function __construct(
@@ -47,6 +48,7 @@ final readonly class ModuleServiceFactory
                 'PrestaShop ' . $this->moduleVersion,
             ),
             1 == $configuration['send_peppol'],
+            new DbPeppolStatusRepository(new PrestaShopDb()),
         );
     }
 
@@ -77,6 +79,23 @@ final readonly class ModuleServiceFactory
             parser: $parser,
             mapper: new CreatedInvoiceResponseMapper(),
             useSandbox: $useSandbox,
+        );
+    }
+
+    public function createPeppolStatusPollingWorker(): PeppolStatusPollingWorker
+    {
+        return new PeppolStatusPollingWorker(
+            new DbPeppolStatusRepository(new PrestaShopDb()),
+            new PollPeppolInvoiceStatusHandler(
+                new GetOrderInvoicePeppolStatusHandler(
+                    new DbOrderInvoiceRepository(new PrestaShopDb()),
+                    new PrestaShopPeppolInvoiceGatewayResolver(
+                        new PeppolInvoiceGatewayFactory(),
+                        'PrestaShop ' . $this->moduleVersion,
+                    ),
+                ),
+            ),
+            new OrderInvoiceLogger(),
         );
     }
 

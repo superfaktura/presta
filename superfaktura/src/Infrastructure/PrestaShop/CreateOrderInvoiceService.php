@@ -13,6 +13,10 @@ use SuperFaktura\PrestaShop\Application\Handler\SubmitPeppolInvoiceHandler;
 use SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference;
 use SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\InvoiceGateway;
 use Throwable;
+use DateTimeImmutable;
+use DateTimeZone;
+use SuperFaktura\PrestaShop\Application\Contract\PeppolStatusTrackingRepositoryInterface;
+use SuperFaktura\PrestaShop\Application\Dto\CreatedInvoice;
 
 final readonly class CreateOrderInvoiceService
 {
@@ -25,6 +29,7 @@ final readonly class CreateOrderInvoiceService
         private bool $sendEmail,
         private PeppolInvoiceGatewayResolverInterface $peppolGateways,
         private bool $sendViaPeppol,
+        private PeppolStatusTrackingRepositoryInterface $peppolStatus,
     ) {
     }
 
@@ -87,29 +92,7 @@ final readonly class CreateOrderInvoiceService
             && $this->sendViaPeppol
             && 'regular' === $this->options->invoiceType
         ) {
-            try {
-                $gateway = $this->peppolGateways->forInvoice(
-                    $reference,
-                    $created->invoice,
-                );
-
-                $result = (new SubmitPeppolInvoiceHandler($gateway))(
-                    $created->invoice->invoiceId,
-                );
-
-                $this->logger->reportPeppolSubmission(
-                    $reference,
-                    $created->invoice,
-                    $result,
-                );
-            } catch (Throwable $exception) {
-                $this->logger->report(
-                    $reference,
-                    'peppol_submission_unconfirmed',
-                    $created->invoice,
-                    $exception,
-                );
-            }
+            $this->submitViaPeppol($reference, $created->invoice);
         }
 
         if (!$this->sendEmail) {
@@ -136,5 +119,47 @@ final readonly class CreateOrderInvoiceService
                 $created->invoice,
             );
         }
+    }
+
+    private function submitViaPeppol(
+        OrderReference $order,
+        CreatedInvoice $invoice,
+    ): void {
+        try {
+            $job = $this->peppolStatus->begin(
+                $order,
+                $invoice,
+                new DateTimeImmutable('now', new DateTimeZone('UTC')),
+            );
+
+            $gateway = $this->peppolGateways->forInvoice($order, $invoice);
+            $result = (new SubmitPeppolInvoiceHandler($gateway))($invoice->invoiceId);
+        } catch (Throwable $exception) {
+            $this->logger->report(
+                $order,
+                'peppol_submission_unconfirmed',
+                $invoice,
+                $exception,
+            );
+
+            return;
+        }
+
+        try {
+            $this->peppolStatus->recordSubmission(
+                $job,
+                $result,
+                new DateTimeImmutable('now', new DateTimeZone('UTC')),
+            );
+        } catch (Throwable $exception) {
+            $this->logger->report(
+                $order,
+                'save_peppol_submission_failed',
+                $invoice,
+                $exception,
+            );
+        }
+
+        $this->logger->reportPeppolSubmission($order, $invoice, $result);
     }
 }

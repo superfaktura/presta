@@ -58,7 +58,7 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.7.6';
+        $this->version       = '1.7.7';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
@@ -131,6 +131,7 @@ class SuperFaktura extends Module
 
         return parent::install()
                && $this->installOrderInvoiceStorage()
+               && $this->installPeppolStatusStorage()
                && $this->registerHook('newOrder')
                && $this->registerHook('actionPaymentConfirmation')
                && $this->registerHook('actionOrderStatusUpdate')
@@ -146,6 +147,19 @@ class SuperFaktura extends Module
 
             return (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceTable($db))
                 ->create();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public function installPeppolStatusStorage(): bool
+    {
+        require_once __DIR__ . '/autoload.php';
+
+        try {
+            return (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PeppolStatusTable(
+                new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PrestaShopDb(),
+            ))->create();
         } catch (\Throwable) {
             return false;
         }

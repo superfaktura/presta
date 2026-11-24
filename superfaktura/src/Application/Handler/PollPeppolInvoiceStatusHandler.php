@@ -19,10 +19,12 @@ use SuperFaktura\PrestaShop\Domain\ValueObject\PeppolOperationId;
 
 final readonly class PollPeppolInvoiceStatusHandler
 {
+    public const MAX_ATTEMPTS = 10;
+    public const INTERVAL_SECONDS = 120;
     public function __construct(
         private GetOrderInvoicePeppolStatusHandler $getStatus,
-        private int $maxAttempts = 10,
-        private int $intervalSeconds = 120,
+        private int $maxAttempts = self::MAX_ATTEMPTS,
+        private int $intervalSeconds = self::INTERVAL_SECONDS,
     ) {
         if (1 > $maxAttempts || 1 > $intervalSeconds) {
             throw new InvalidArgumentException('Polling attempts and interval must be positive.');
@@ -32,7 +34,7 @@ final readonly class PollPeppolInvoiceStatusHandler
     public function __invoke(
         OrderReference $order,
         CreatedInvoice $invoice,
-        PeppolOperationId $operationId,
+        ?PeppolOperationId $operationId,
         int $attempt,
         DateTimeImmutable $checkedAt,
     ): PeppolStatusPollResult {
@@ -43,7 +45,13 @@ final readonly class PollPeppolInvoiceStatusHandler
         $status = $this->readStatus($order, $invoice);
         $observedOperationId = $status?->operationId;
 
-        if (null === $observedOperationId || 0 !== strcasecmp($observedOperationId->value, $operationId->value)) {
+        if (
+            null === $observedOperationId
+            || (
+                null !== $operationId
+                && 0 !== strcasecmp($observedOperationId->value, $operationId->value)
+            )
+        ) {
             $status = null;
         }
 
