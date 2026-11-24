@@ -63,38 +63,6 @@ class SuperFaktura extends Module
         $this->need_instance = 1;
 
 
-        $config = Configuration::getMultiple(array('SUPERFAKTURA_EMAIL', 'SUPERFAKTURA_APIKEY', 'SUPERFAKTURA_COMPANY_ID', 'SUPERFAKTURA_ORDER_STATE_REFUND', 'SUPERFAKTURA_ORDER_STATE_INVOICE', 'SUPERFAKTURA_SET_INVOICE_PAID', 'SUPERFAKTURA_VARIABLE_SOURCE', 'SUPERFAKTURA_SEQUENCE_ID', 'SUPERFAKTURA_SEND_INVOICE', 'SUPERFAKTURA_INVOICE_TYPE', 'SUPERFAKTURA_INVOICE_LANGUAGE', 'SUPERFAKTURA_ISSUED_BY', 'SUPERFAKTURA_ISSUED_BY_PHONE', 'SUPERFAKTURA_ISSUED_BY_WEB', 'SUPERFAKTURA_ISSUED_BY_EMAIL', 'SUPERFAKTURA_BY_SQUARE', 'SUPERFAKTURA_LOGO_ID', 'SUPERFAKTURA_BANK_ID', 'SUPERFAKTURA_CANCEL_SEQUENCE_ID', 'SUPERFAKTURA_PRODUCT_SYNTETIC', 'SUPERFAKTURA_PRODUCT_ANALYTIC', 'SUPERFAKTURA_CARRIER_SYNTETIC', 'SUPERFAKTURA_CARRIER_ANALYTIC', 'SUPERFAKTURA_CALLBACK_PAYMENT', 'SUPERFAKTURA_PAYPAL', 'SUPERFAKTURA_ONLINE_PAYMENT', 'SUPERFAKTURA_UPDATE_ADDRESSBOOK', 'SUPERFAKTURA_USE_SANDBOX', 'SUPERFAKTURA_ADD_ROUNDING'));
-
-        $this->email                    = isset($config['SUPERFAKTURA_EMAIL']) ? $config['SUPERFAKTURA_EMAIL'] : "";
-        $this->apikey                   = isset($config['SUPERFAKTURA_APIKEY']) ? $config['SUPERFAKTURA_APIKEY'] : "";
-        $this->company_id               = isset($config['SUPERFAKTURA_COMPANY_ID']) ? $config['SUPERFAKTURA_COMPANY_ID'] : "";
-        $this->id_order_state_invoice   = isset($config['SUPERFAKTURA_ORDER_STATE_INVOICE']) ? $config['SUPERFAKTURA_ORDER_STATE_INVOICE'] : -1;
-        $this->id_order_state_refund    = isset($config['SUPERFAKTURA_ORDER_STATE_REFUND']) ? $config['SUPERFAKTURA_ORDER_STATE_REFUND'] : 0;
-        $this->set_invoice_paid         = isset($config['SUPERFAKTURA_SET_INVOICE_PAID']) ? $config['SUPERFAKTURA_SET_INVOICE_PAID'] : 0;
-        $this->variable_source          = isset($config['SUPERFAKTURA_VARIABLE_SOURCE']) ? $config['SUPERFAKTURA_VARIABLE_SOURCE'] : 'order';
-        $this->sequence_id              = isset($config['SUPERFAKTURA_SEQUENCE_ID']) ? $config['SUPERFAKTURA_SEQUENCE_ID'] : "";
-        $this->send_invoice             = isset($config['SUPERFAKTURA_SEND_INVOICE']) ? $config['SUPERFAKTURA_SEND_INVOICE'] : 0;
-        $this->invoice_type             = isset($config['SUPERFAKTURA_INVOICE_TYPE']) ? $config['SUPERFAKTURA_INVOICE_TYPE'] : 'regular';
-        $this->invoice_language         = isset($config['SUPERFAKTURA_INVOICE_LANGUAGE']) ? $config['SUPERFAKTURA_INVOICE_LANGUAGE'] : 'slo';
-        $this->issued_by                = isset($config['SUPERFAKTURA_ISSUED_BY']) ? $config['SUPERFAKTURA_ISSUED_BY'] : "";
-        $this->issued_by_phone          = isset($config['SUPERFAKTURA_ISSUED_BY_PHONE']) ? $config['SUPERFAKTURA_ISSUED_BY_PHONE'] : "";
-        $this->issued_by_web            = isset($config['SUPERFAKTURA_ISSUED_BY_WEB']) ? $config['SUPERFAKTURA_ISSUED_BY_WEB'] : "";
-        $this->issued_by_email          = isset($config['SUPERFAKTURA_ISSUED_BY_EMAIL']) ? $config['SUPERFAKTURA_ISSUED_BY_EMAIL'] : "";
-        $this->by_square                = isset($config['SUPERFAKTURA_BY_SQUARE']) ? $config['SUPERFAKTURA_BY_SQUARE'] : "";
-        $this->logo_id                  = isset($config['SUPERFAKTURA_LOGO_ID']) ? $config['SUPERFAKTURA_LOGO_ID'] : "";
-        $this->bank_id                  = isset($config['SUPERFAKTURA_BANK_ID']) ? $config['SUPERFAKTURA_BANK_ID'] : "";
-        $this->cancel_sequence_id       = isset($config['SUPERFAKTURA_CANCEL_SEQUENCE_ID']) ? $config['SUPERFAKTURA_CANCEL_SEQUENCE_ID'] : "";
-        $this->product_syntetic         = isset($config['SUPERFAKTURA_PRODUCT_SYNTETIC']) ? $config['SUPERFAKTURA_PRODUCT_SYNTETIC'] : "";
-        $this->product_analytic         = isset($config['SUPERFAKTURA_PRODUCT_ANALYTIC']) ? $config['SUPERFAKTURA_PRODUCT_ANALYTIC'] : "";
-        $this->carrier_syntetic         = isset($config['SUPERFAKTURA_CARRIER_SYNTETIC']) ? $config['SUPERFAKTURA_CARRIER_SYNTETIC'] : "";
-        $this->carrier_analytic         = isset($config['SUPERFAKTURA_CARRIER_ANALYTIC']) ? $config['SUPERFAKTURA_CARRIER_ANALYTIC'] : "";
-        $this->online_payment           = isset($config['SUPERFAKTURA_ONLINE_PAYMENT']) ? $config['SUPERFAKTURA_ONLINE_PAYMENT'] : "";
-        $this->paypal                   = isset($config['SUPERFAKTURA_PAYPAL']) ? $config['SUPERFAKTURA_PAYPAL'] : "";
-        $this->callback_payment         = isset($config['SUPERFAKTURA_CALLBACK_PAYMENT']) ? $config['SUPERFAKTURA_CALLBACK_PAYMENT'] : "";
-        $this->update_addressbook       = isset($config['SUPERFAKTURA_UPDATE_ADDRESSBOOK']) ? $config['SUPERFAKTURA_UPDATE_ADDRESSBOOK'] : "";
-        $this->use_sandbox              = isset($config['SUPERFAKTURA_USE_SANDBOX']) ? $config['SUPERFAKTURA_USE_SANDBOX'] : "";
-        $this->add_rounding             = isset($config['SUPERFAKTURA_ADD_ROUNDING']) ? $config['SUPERFAKTURA_ADD_ROUNDING'] : "";
-
         parent::__construct();
         $this->loadModuleConfiguration();
 
@@ -443,19 +411,6 @@ class SuperFaktura extends Module
     }
 
 
-    private function createPeppolInvoiceGateway(): \SuperFaktura\PrestaShop\Application\Contract\PeppolInvoiceGatewayInterface
-    {
-        require_once __DIR__ . '/autoload.php';
-
-        return (new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\PeppolInvoiceGatewayFactory())->create(
-            (string) $this->email,
-            (string) $this->apikey,
-            (string) $this->company_id,
-            'PrestaShop ' . $this->version,
-            1 == $this->use_sandbox,
-        );
-    }
-
     /** @return array<string, string|int|bool> */
     private function loadModuleConfiguration(?Order $order = null): array
     {
@@ -473,212 +428,87 @@ class SuperFaktura extends Module
         return $values;
     }
 
-    private function loadOrderConfiguration(Order $order): bool
+    /** @return array<string, string|int|bool>|null */
+    private function loadOrderConfiguration(Order $order): ?array
     {
         $shopId = (int) $order->id_shop;
         $orderId = (int) $order->id;
 
         if (0 >= $shopId || 0 >= $orderId) {
-            return false;
+            return null;
         }
 
         try {
-            $this->loadModuleConfiguration($order);
-
-            return true;
+            return $this->loadModuleConfiguration($order);
         } catch (\Throwable $exception) {
             $reference = new \SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference($shopId, $orderId);
-
             (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger())->report(
                 $reference,
                 'load_configuration_failed',
                 exception: $exception,
             );
 
-            return false;
+            return null;
         }
     }
 
-    private function createInvoiceGateway(): \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\InvoiceGateway
+    private function createServiceFactory(): \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleServiceFactory
     {
         require_once __DIR__ . '/autoload.php';
 
-        $parser = new \SuperFaktura\PrestaShop\Infrastructure\Api\Service\JsonParser();
-        $useSandbox = 1 == $this->use_sandbox;
-
-        $client = (new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\SuperFakturaClientFactory())->create(
-            email: (string) $this->email,
-            apiKey: (string) $this->apikey,
-            companyId: (string) $this->company_id,
-            moduleName: 'PrestaShop ' . $this->version,
-            useSandbox: $useSandbox,
-        );
-
-        $request = new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\LegacyApiRequest(
-            client: $client,
-            parser: $parser,
+        return new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleServiceFactory(
+            moduleVersion: (string) $this->version,
+            prestaShopVersion: (string) _PS_VERSION_,
             applicationTitle: (string) ($_SERVER['SERVER_NAME'] ?? ''),
-            moduleIdentification: 'PrestaShop: ' . _PS_VERSION_ . ' module: ' . $this->version . ' ',
-        );
-
-        return new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\InvoiceGateway(
-            request: $request,
-            parser: $parser,
-            mapper: new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\CreatedInvoiceResponseMapper(),
-            useSandbox: $useSandbox,
-        );
-    }
-
-    private function _createInvoice($order, $cart)
-    {
-        require_once __DIR__ . '/autoload.php';
-
-        if (!$this->loadOrderConfiguration($order)) {
-            return;
-        }
-
-        (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ShopContextRunner())->runForShop(
-            (int) $order->id_shop,
-            function () use ($order, $cart): void {
-                $this->_createInvoiceInShop($order, $cart);
-            },
         );
     }
 
 
-
-    private function _createInvoiceInShop($order, $cart)
+    /** @param array<string, string|int|bool> $configuration */
+    private function _createInvoice(Order $order, Cart $cart, #[\SensitiveParameter] array $configuration): void
     {
-        require_once __DIR__ . '/autoload.php';
-
-        $orderReference = new \SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference(
+        $reference = new \SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference(
             (int) $order->id_shop,
             (int) $order->id,
         );
 
-        $logger = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger();
+        (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ShopContextRunner())->runForShop(
+            $reference->shopId,
+            function () use ($order, $cart, $configuration, $reference): void {
+                try {
+                    $createInvoice = $this->createServiceFactory()->createOrderInvoiceService($configuration);
+                } catch (\Throwable $exception) {
+                    (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger())->report(
+                        $reference,
+                        'prepare_invoice_failed',
+                        exception: $exception,
+                    );
 
-        if (Shop::isFeatureActive()) {
-            Shop::setContext(Shop::CONTEXT_SHOP, $order->id_shop);
-        }
+                    return;
+                }
 
-        $options = new \SuperFaktura\PrestaShop\Application\Dto\InvoiceCreationOptions(
-            invoiceType: (string) $this->invoice_type,
-            useOrderIdAsVariable: 'order' === $this->variable_source,
-            alreadyPaid: 1 == $this->set_invoice_paid,
-            updateAddressBook: (bool) $this->update_addressbook,
-            addCashOnDeliveryRounding: (bool) $this->add_rounding,
-            language: (string) $this->invoice_language,
-            sequenceId: $this->sequence_id ?: '',
-            issuedBy: (string) ($this->issued_by ?: ''),
-            issuedByPhone: (string) ($this->issued_by_phone ?: ''),
-            issuedByWeb: (string) ($this->issued_by_web ?: ''),
-            issuedByEmail: (string) ($this->issued_by_email ?: ''),
-            logoId: $this->logo_id ?: '',
-            bankId: $this->bank_id ?: null,
-            productSyntheticAccount: $this->product_syntetic ?: '',
-            productAnalyticAccount: $this->product_analytic ?: '',
-            carrierSyntheticAccount: $this->carrier_syntetic ?: '',
-            carrierAnalyticAccount: $this->carrier_analytic ?: '',
-            bySquare: $this->by_square,
-            onlinePayment: $this->online_payment,
-            paypal: $this->paypal,
-            callbackPayment: $this->callback_payment,
+                $createInvoice->create($order, $cart);
+            },
         );
-
-        $builder = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\InvoicePayloadBuilder(
-            new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\InvoiceClientMapper(
-                new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\LegacyCountryIdMapper(),
-            ),
-            new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PaymentMethodMapper(),
-        );
-
-        try {
-            $data = $builder->build($order, $cart, $options);
-            $payloadJson = json_encode($data, JSON_THROW_ON_ERROR);
-
-            $invoices = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\DbOrderInvoiceRepository(
-                new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PrestaShopDb(),
-            );
-
-            $gateway = $this->createInvoiceGateway();
-        } catch (\Throwable $exception) {
-            $logger->report(
-                $orderReference,
-                'prepare_invoice_failed',
-                exception: $exception,
-            );
-
-            return;
-        }
-
-        try {
-            $created = $gateway->create($payloadJson);
-        } catch (\Throwable $exception) {
-            $logger->report(
-                $orderReference,
-                'invoice_creation_unconfirmed',
-                exception: $exception,
-            );
-
-            return;
-        }
-
-        if (null === $created) {
-            $logger->report($orderReference, 'invoice_creation_unconfirmed');
-
-            return;
-        }
-
-        try {
-            $invoices->save($orderReference, $created->invoice);
-        } catch (\Throwable $exception) {
-            $logger->report(
-                $orderReference,
-                'save_invoice_reference_failed',
-                $created->invoice,
-                $exception,
-            );
-        }
-
-        if (1 == $this->send_invoice) {
-            try {
-                $sent = $gateway->sendEmail($created);
-            } catch (\Throwable $exception) {
-                $logger->report(
-                    $orderReference,
-                    'invoice_email_unconfirmed',
-                    $created->invoice,
-                    $exception,
-                );
-
-                return;
-            }
-
-            if (!$sent) {
-                $logger->report(
-                    $orderReference,
-                    'invoice_email_unconfirmed',
-                    $created->invoice,
-                );
-            }
-        }
     }
 
 
     public function hookNewOrder($params)
     {
         $order = $params['order'] ?? null;
+        $cart = $params['cart'] ?? null;
 
-        if (!$order instanceof Order || !$this->loadOrderConfiguration($order)) {
+        if (!$order instanceof Order || !$cart instanceof Cart) {
             return;
         }
 
-        if (0 != $this->id_order_state_invoice) {
+        $configuration = $this->loadOrderConfiguration($order);
+
+        if (null === $configuration || 0 != $configuration['id_order_state_invoice']) {
             return;
         }
 
-        $this->_createInvoice($order, $params['cart']);
+        $this->_createInvoice($order, $cart, $configuration);
     }
 
     public function hookActionPaymentConfirmation($params)
@@ -687,11 +517,13 @@ class SuperFaktura extends Module
 
         $order = $this->orderFromHook($params);
 
-        if (null === $order || !$this->loadOrderConfiguration($order)) {
+        if (null === $order) {
             return;
         }
 
-        if (1 == $this->set_invoice_paid) {
+        $configuration = $this->loadOrderConfiguration($order);
+
+        if (null === $configuration || 1 == $configuration['set_invoice_paid']) {
             return;
         }
 
@@ -702,14 +534,10 @@ class SuperFaktura extends Module
         $logger = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger();
 
         try {
-            $recordPayment = $this->createRecordOrderInvoicePaymentHandler();
+            $recordPayment = $this->createServiceFactory()->createRecordOrderInvoicePaymentHandler($configuration);
             $confirmed = $recordPayment($reference, new \DateTimeImmutable('today'));
         } catch (\Throwable $exception) {
-            $logger->report(
-                $reference,
-                'invoice_payment_unconfirmed',
-                exception: $exception,
-            );
+            $logger->report($reference, 'invoice_payment_unconfirmed', exception: $exception);
 
             return;
         }
@@ -742,20 +570,24 @@ class SuperFaktura extends Module
 
         $order = $this->orderFromHook($params);
 
-        if (null === $order || !$this->loadOrderConfiguration($order)) {
+        if (null === $order) {
             return;
         }
 
-        $isRefund = (int) $this->id_order_state_refund === $statusId;
-        $isInvoice = (int) $this->id_order_state_invoice === $statusId;
+        $configuration = $this->loadOrderConfiguration($order);
+
+        if (null === $configuration) {
+            return;
+        }
+
+        $isRefund = (int) $configuration['id_order_state_refund'] === $statusId;
+        $isInvoice = (int) $configuration['id_order_state_invoice'] === $statusId;
 
         if (!$isRefund && !$isInvoice) {
             return;
         }
 
         if ($isRefund) {
-            require_once __DIR__ . '/autoload.php';
-
             $reference = new \SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference(
                 (int) $order->id_shop,
                 (int) $order->id,
@@ -763,20 +595,14 @@ class SuperFaktura extends Module
             $logger = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger();
 
             try {
-                $sequenceId = $this->cancel_sequence_id
-                    ? (string) $this->cancel_sequence_id
+                $sequenceId = $configuration['cancel_sequence_id']
+                    ? (string) $configuration['cancel_sequence_id']
                     : null;
-
-                $confirmed = $this->createInvoiceGateway()->createCreditNote(
-                    $reference,
-                    $sequenceId,
-                );
+                $confirmed = $this->createServiceFactory()
+                    ->createInvoiceGateway($configuration)
+                    ->createCreditNote($reference, $sequenceId);
             } catch (\Throwable $exception) {
-                $logger->report(
-                    $reference,
-                    'credit_note_creation_unconfirmed',
-                    exception: $exception,
-                );
+                $logger->report($reference, 'credit_note_creation_unconfirmed', exception: $exception);
 
                 return;
             }
@@ -789,7 +615,7 @@ class SuperFaktura extends Module
         }
 
         $cart = new Cart($order->id_cart);
-        $this->_createInvoice($order, $cart);
+        $this->_createInvoice($order, $cart, $configuration);
     }
 
     /**
@@ -819,18 +645,6 @@ class SuperFaktura extends Module
             ->isCashOnDelivery($payment);
     }
 
-
-    private function createRecordOrderInvoicePaymentHandler(): \SuperFaktura\PrestaShop\Application\Handler\RecordOrderInvoicePaymentHandler
-    {
-        require_once __DIR__ . '/autoload.php';
-
-        return new \SuperFaktura\PrestaShop\Application\Handler\RecordOrderInvoicePaymentHandler(
-            new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\DbOrderPaymentDetailsRepository(
-                new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PrestaShopDb(),
-            ),
-            $this->createInvoiceGateway(),
-        );
-    }
 
     /** @param array{id_order?: int|string} $params */
     private function orderFromHook(array $params): ?Order
