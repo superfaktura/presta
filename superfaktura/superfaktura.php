@@ -424,48 +424,6 @@ class SuperFaktura extends Module
     }
 
 
-    private function _request($url, $data = "")
-    {
-        require_once __DIR__ . '/autoload.php';
-
-        $baseUrl = $this->getSfUrl('');
-
-        if (!is_string($url) || !str_starts_with($url, $baseUrl . '/')) {
-            return false;
-        }
-
-        $payloadJson = null;
-
-        if ('' !== $data && [] !== $data) {
-            if (!is_array($data) || !isset($data['data']) || !is_string($data['data'])) {
-                return false;
-            }
-
-            $payloadJson = $data['data'];
-        }
-
-        try {
-            $client = (new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\SuperFakturaClientFactory())->create(
-                email: (string) $this->email,
-                apiKey: (string) $this->apikey,
-                companyId: (string) $this->company_id,
-                moduleName: 'PrestaShop ' . $this->version,
-                useSandbox: 1 == $this->use_sandbox,
-            );
-        } catch (\InvalidArgumentException) {
-            return false;
-        }
-
-        $request = new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\LegacyApiRequest(
-            client: $client,
-            parser: new \SuperFaktura\PrestaShop\Infrastructure\Api\Service\JsonParser(),
-            applicationTitle: (string) ($_SERVER['SERVER_NAME'] ?? ''),
-            moduleIdentification: 'PrestaShop: ' . _PS_VERSION_ . ' module: ' . $this->version . ' ',
-        );
-
-        return $request->post(substr($url, strlen($baseUrl)), $payloadJson);
-    }
-
     private function createPeppolInvoiceGateway(): \SuperFaktura\PrestaShop\Application\Contract\PeppolInvoiceGatewayInterface
     {
         require_once __DIR__ . '/autoload.php';
@@ -641,46 +599,121 @@ class SuperFaktura extends Module
 
     public function hookActionPaymentConfirmation($params)
     {
-        if (1 == $this->set_invoice_paid)
-            return; // faktura sa nastavila ako uhradena pri vytvarani
+        if (1 == $this->set_invoice_paid) {
+            return;
+        }
 
+        require_once __DIR__ . '/autoload.php';
 
-        $order = Db::getInstance()->getRow("SELECT o.total_paid, c.iso_code
-                                            FROM " . _DB_PREFIX_ . "orders AS o
-                                            LEFT JOIN " . _DB_PREFIX_ . "currency AS c ON c.id_currency=o.id_currency
-                                            WHERE o.id_order=" . $params['id_order']);
+        $order = $this->orderFromHook($params);
 
-        if ($order)
-        {
-            //TODO: Typ platby v superfakture: transfer, cash, paypal, credit, cod
+        if (null === $order) {
+            return;
+        }
 
-            $data['InvoicePayment'] = array(
-                'import_type'  => "prestashop",
-                'import_id'    => $params['id_order'],
-                'payment_type' => "transfer",
-                'amount'       => $order['total_paid'],
-                'currency'     => $order['iso_code'],
-                'created'      => date('Y-m-d')
+        $reference = new \SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference(
+            (int) $order->id_shop,
+            (int) $order->id,
+        );
+
+        $logger = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger();
+
+        try {
+            $recordPayment = $this->createRecordOrderInvoicePaymentHandler();
+            $confirmed = $recordPayment(
+                $reference,
+                new \DateTimeImmutable('today'),
+            );
+        } catch (\Throwable $exception) {
+            $logger->report(
+                $reference,
+                'invoice_payment_unconfirmed',
+                exception: $exception,
             );
 
-            $response = $this->_request($this->getSfUrl(self::SF_URL_PAY_INVOICE . $params['id_order']), array('data' => json_encode($data)));
+            return;
+        }
+
+        if (false === $confirmed) {
+            $logger->report($reference, 'invoice_payment_unconfirmed');
         }
     }
 
 
     public function hookActionOrderStatusUpdate($params)
     {
-        if (intval($this->id_order_state_refund) == intval($params['newOrderStatus']->id))
-        {      
-            $response = $this->_request($this->getSfUrl(self::SF_URL_CREATE_CANCEL . $params['id_order'] . (!empty($this->cancel_sequence_id) ? '/sequence_id:' . $this->cancel_sequence_id : '')));
-        }
-        elseif ($this->id_order_state_invoice == $params['newOrderStatus']->id)
-        {
-            $order = new Order($params['id_order']);
-            $cart = new Cart($order->id_cart);
+        $status = $params['newOrderStatus'] ?? null;
 
-            $this->_createInvoice($order, $cart);
+        if (!is_object($status)) {
+            return;
         }
+
+        $value = $status->id ?? null;
+
+        if (!is_int($value) && !is_string($value)) {
+            return;
+        }
+
+        $statusId = filter_var($value, FILTER_VALIDATE_INT);
+
+        if (false === $statusId || 0 >= $statusId) {
+            return;
+        }
+
+        $isRefund = (int) $this->id_order_state_refund === $statusId;
+        $isInvoice = (int) $this->id_order_state_invoice === $statusId;
+
+        if (!$isRefund && !$isInvoice) {
+            return;
+        }
+
+        $order = $this->orderFromHook($params);
+
+        if (null === $order) {
+            return;
+        }
+
+        if ($isRefund) {
+            require_once __DIR__ . '/autoload.php';
+
+            $reference = new \SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference(
+                (int) $order->id_shop,
+                (int) $order->id,
+            );
+
+            $logger = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger();
+
+            try {
+                $sequenceId = $this->cancel_sequence_id
+                    ? (string) $this->cancel_sequence_id
+                    : null;
+
+                $confirmed = $this->createInvoiceGateway()->createCreditNote(
+                    $reference,
+                    $sequenceId,
+                );
+            } catch (\Throwable $exception) {
+                $logger->report(
+                    $reference,
+                    'credit_note_creation_unconfirmed',
+                    exception: $exception,
+                );
+
+                return;
+            }
+
+            if (!$confirmed) {
+                $logger->report(
+                    $reference,
+                    'credit_note_creation_unconfirmed',
+                );
+            }
+
+            return;
+        }
+
+        $cart = new Cart($order->id_cart);
+        $this->_createInvoice($order, $cart);
     }
 
     /**
@@ -708,5 +741,52 @@ class SuperFaktura extends Module
 
         return (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PaymentMethodMapper())
             ->isCashOnDelivery($payment);
+    }
+
+
+    private function createRecordOrderInvoicePaymentHandler(): \SuperFaktura\PrestaShop\Application\Handler\RecordOrderInvoicePaymentHandler
+    {
+        require_once __DIR__ . '/autoload.php';
+
+        return new \SuperFaktura\PrestaShop\Application\Handler\RecordOrderInvoicePaymentHandler(
+            new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\DbOrderPaymentDetailsRepository(
+                new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PrestaShopDb(),
+            ),
+            $this->createInvoiceGateway(),
+        );
+    }
+
+    /** @param array{id_order?: int|string} $params */
+    private function orderFromHook(array $params): ?Order
+    {
+        $value = $params['id_order'] ?? null;
+
+        if (!is_int($value) && !is_string($value)) {
+            return null;
+        }
+
+        $orderId = filter_var($value, FILTER_VALIDATE_INT);
+
+        if (false === $orderId || 0 >= $orderId) {
+            return null;
+        }
+
+        try {
+            $order = new Order($orderId);
+
+            if ($orderId !== (int) $order->id || 0 >= (int) $order->id_shop) {
+                return null;
+            }
+
+            return $order;
+        } catch (\Throwable $exception) {
+            error_log(sprintf(
+                'SuperFaktura: load_order_failed; order_id=%d; exception=%s.',
+                $orderId,
+                $exception::class,
+            ));
+
+            return null;
+        }
     }
 }
