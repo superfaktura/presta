@@ -56,7 +56,7 @@ class SuperFaktura extends Module
     {
         $this->name          = "superfaktura";
         $this->tab           = "billing_invoicing";
-        $this->version       = '1.7.5';
+        $this->version       = '1.7.6';
         $this->author        = "www.superfaktura.sk";
         $this->need_instance = 1;
 
@@ -122,16 +122,30 @@ class SuperFaktura extends Module
 
     public function install()
     {
-        if (Shop::isFeatureActive())
+        if (Shop::isFeatureActive()) {
             Shop::setContext(Shop::CONTEXT_ALL);
+        }
 
-        return (
-            parent::install()
-            && $this->registerHook('newOrder')
-            && $this->registerHook('actionPaymentConfirmation')
-            && $this->registerHook('actionOrderStatusUpdate')
-            && $this->registerHook('PDFInvoice')
-        );
+        return parent::install()
+               && $this->installOrderInvoiceStorage()
+               && $this->registerHook('newOrder')
+               && $this->registerHook('actionPaymentConfirmation')
+               && $this->registerHook('actionOrderStatusUpdate')
+               && $this->registerHook('PDFInvoice');
+    }
+
+    public function installOrderInvoiceStorage(): bool
+    {
+        require_once __DIR__ . '/autoload.php';
+
+        try {
+            $db = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PrestaShopDb();
+
+            return (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceTable($db))
+                ->create();
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function uninstall()
@@ -465,11 +479,48 @@ class SuperFaktura extends Module
         );
     }
 
+    private function createInvoiceGateway(): \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\InvoiceGateway
+    {
+        require_once __DIR__ . '/autoload.php';
+
+        $parser = new \SuperFaktura\PrestaShop\Infrastructure\Api\Service\JsonParser();
+        $useSandbox = 1 == $this->use_sandbox;
+
+        $client = (new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\SuperFakturaClientFactory())->create(
+            email: (string) $this->email,
+            apiKey: (string) $this->apikey,
+            companyId: (string) $this->company_id,
+            moduleName: 'PrestaShop ' . $this->version,
+            useSandbox: $useSandbox,
+        );
+
+        $request = new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\LegacyApiRequest(
+            client: $client,
+            parser: $parser,
+            applicationTitle: (string) ($_SERVER['SERVER_NAME'] ?? ''),
+            moduleIdentification: 'PrestaShop: ' . _PS_VERSION_ . ' module: ' . $this->version . ' ',
+        );
+
+        return new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\InvoiceGateway(
+            request: $request,
+            parser: $parser,
+            mapper: new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\CreatedInvoiceResponseMapper(),
+            useSandbox: $useSandbox,
+        );
+    }
+
 
 
     private function _createInvoice($order, $cart)
     {
         require_once __DIR__ . '/autoload.php';
+
+        $orderReference = new \SuperFaktura\PrestaShop\Domain\ValueObject\OrderReference(
+            (int) $order->id_shop,
+            (int) $order->id,
+        );
+
+        $logger = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\OrderInvoiceLogger();
 
         if (Shop::isFeatureActive()) {
             Shop::setContext(Shop::CONTEXT_SHOP, $order->id_shop);
@@ -509,37 +560,72 @@ class SuperFaktura extends Module
         try {
             $data = $builder->build($order, $cart, $options);
             $payloadJson = json_encode($data, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return;
-        }
 
-        $responseBody = $this->_request(
-            $this->getSfUrl(self::SF_URL_CREATE_INVOICE),
-            ['data' => $payloadJson],
-        );
-
-        if (false === $responseBody) {
-            return;
-        }
-
-        $response = json_decode($responseBody);
-
-        if (!$response) {
-            return;
-        }
-
-        if (isset($response->error) && 0 == $response->error && 1 == $this->send_invoice) {
-            $requestData = [
-                'Email' => [
-                    'invoice_id' => $response->data->Invoice->id,
-                    'to' => $response->data->Client->email,
-                ],
-            ];
-
-            $this->_request(
-                $this->getSfUrl(self::SF_URL_SEND_INVOICE),
-                ['data' => json_encode($requestData)],
+            $invoices = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\DbOrderInvoiceRepository(
+                new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PrestaShopDb(),
             );
+
+            $gateway = $this->createInvoiceGateway();
+        } catch (\Throwable $exception) {
+            $logger->report(
+                $orderReference,
+                'prepare_invoice_failed',
+                exception: $exception,
+            );
+
+            return;
+        }
+
+        try {
+            $created = $gateway->create($payloadJson);
+        } catch (\Throwable $exception) {
+            $logger->report(
+                $orderReference,
+                'invoice_creation_unconfirmed',
+                exception: $exception,
+            );
+
+            return;
+        }
+
+        if (null === $created) {
+            $logger->report($orderReference, 'invoice_creation_unconfirmed');
+
+            return;
+        }
+
+        try {
+            $invoices->save($orderReference, $created->invoice);
+        } catch (\Throwable $exception) {
+            $logger->report(
+                $orderReference,
+                'save_invoice_reference_failed',
+                $created->invoice,
+                $exception,
+            );
+        }
+
+        if (1 == $this->send_invoice) {
+            try {
+                $sent = $gateway->sendEmail($created);
+            } catch (\Throwable $exception) {
+                $logger->report(
+                    $orderReference,
+                    'invoice_email_unconfirmed',
+                    $created->invoice,
+                    $exception,
+                );
+
+                return;
+            }
+
+            if (!$sent) {
+                $logger->report(
+                    $orderReference,
+                    'invoice_email_unconfirmed',
+                    $created->invoice,
+                );
+            }
         }
     }
 
