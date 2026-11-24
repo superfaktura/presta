@@ -172,39 +172,42 @@ class SuperFaktura extends Module
 
         $this->_html = '<h2>' . $this->displayName . '</h2>';
         $currentValues = $this->loadModuleConfiguration();
+        $formValues = $currentValues;
 
         if (Tools::isSubmit('btnSubmit')) {
             try {
-                $values = (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleConfigurationForm())
+                $formValues = (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleConfigurationForm())
                     ->read($currentValues);
             } catch (\InvalidArgumentException) {
                 $this->_html .= '<div class="error">'
                                 . $this->l('Nastavenia obsahujú neplatné hodnoty.')
                                 . '</div>';
 
+                $this->_displayForm($currentValues);
+
                 return $this->_html;
             }
 
             $errors = [];
 
-            if ('' === trim((string) $values['email'])) {
+            if ('' === trim((string) $formValues['email'])) {
                 $errors[] = $this->l('E-mail musí byť vyplnený.');
             }
 
-            if ('' === trim((string) $values['apikey'])) {
+            if ('' === trim((string) $formValues['apikey'])) {
                 $errors[] = $this->l('API key musí byť vyplnené.');
             }
 
-            if (0 == $values['id_order_state_refund']) {
+            if (0 == $formValues['id_order_state_refund']) {
                 $this->warning .= $this->l('Stav objednávky pre vytvorenie dobropisu musí byť vyplnený');
             }
 
             if ([] === $errors) {
                 try {
                     (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleConfigurationStore())
-                        ->save($values);
+                        ->save($formValues);
 
-                    $this->loadModuleConfiguration();
+                    $formValues = $this->loadModuleConfiguration();
 
                     $this->_html .= '<div class="conf">'
                                     . $this->l('Nastavenia uložené')
@@ -221,187 +224,63 @@ class SuperFaktura extends Module
             }
         }
 
-        $this->_displayForm();
+        $this->_displayForm($formValues);
 
         return $this->_html;
     }
 
-    private function _displayForm()
+    /** @param array<string, string|int|bool> $values */
+    private function _displayForm(array $values): void
     {
+        require_once __DIR__ . '/autoload.php';
+
         global $cookie;
 
-        $states = OrderState::getOrderStates((int)($cookie->id_lang));
+        $labels = [
+            'sandbox_notice' => $this->l('Doklady budú vystavované na Sandboxe'),
+            'sandbox' => $this->l('Vystavovať doklady na Sandboxe'),
+            'invoice_trigger' => $this->l('Faktúru vytvárať pri'),
+            'paid' => $this->l('Pri vytvorení faktúry ju nastaviť ako uhradenú'),
+            'rounding' => $this->l('Pridať centové / halierové vyrovnanie pre platbu v hotovosti'),
+            'refund_trigger' => $this->l('Stav objednávky pre vytvorenie dobropisu'),
+            'variable_source' => $this->l('Variabilný symbol na faktúre'),
+            'variable_order' => $this->l('Číslo objednávky'),
+            'variable_invoice' => $this->l('Číslo faktúry'),
+            'send_invoice' => $this->l('Po vytvorení dokladu odoslať faktúru klientovi'),
+            'update_addressbook' => $this->l('Po vytvorení dokladu zaktualizuje údaje klienta'),
+            'invoice_language' => $this->l('Vyberte jazyk v ktorom chcete doklady vystavovať'),
+            'language_slo' => $this->l('Slovenčina'),
+            'language_cze' => $this->l('Čeština'),
+            'language_eng' => $this->l('Angličtina'),
+            'language_deu' => $this->l('Nemčina'),
+            'language_rus' => $this->l('Ruština'),
+            'language_ukr' => $this->l('Ukrajinčina'),
+            'language_hun' => $this->l('Maďarčina'),
+            'language_pol' => $this->l('Poľština'),
+            'language_rom' => $this->l('Rumunčina'),
+            'language_hrv' => $this->l('Chorvátčina'),
+            'language_slv' => $this->l('Slovinčina'),
+            'language_spa' => $this->l('Španielčina'),
+            'language_ita' => $this->l('Taliančina'),
+            'language_nld' => $this->l('Holandčina'),
+            'invoice_type' => $this->l('Typ dokladu, ktorý chcete vystavovať'),
+            'type_regular' => $this->l('Ostrá faktúra'),
+            'type_proforma' => $this->l('Zálohová faktúra'),
+            'type_order' => $this->l('Objednávka'),
+            'by_square' => $this->l('Zobraziť Pay by square na faktúre'),
+            'online_payment' => $this->l('Zobraziť Online platby na faktúre'),
+            'paypal' => $this->l('Zobraziť Paypal na faktúre'),
+            'accounting' => $this->l('Účtovníctvo'),
+            'save' => $this->l('Uložiť'),
+        ];
 
-        if (!empty($this->use_sandbox)) {
-            $this->_html .= '<div style="width: 517px; margin: 10px auto; color: red; font-size; font-size: 20px;">' .  $this->l("Doklady budú vystavované na Sandboxe") . '</div>';            
-        }
-
-        $this->_html .= '<div style="width: 517px; margin: 10px auto;">
-            <form action="'.Tools::htmlentitiesUTF8($_SERVER['REQUEST_URI']).'" method="post">
-
-                <strong>E-mail: <sup>*</sup></strong><br />
-                <input type="text" name="email" size="50" value="' . htmlentities(Tools::getValue('email', $this->email), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-
-                <strong>API key: <sup>*</sup></strong><br />
-                <input type="text" name="apikey" size="50" value="' . htmlentities(Tools::getValue('apikey', $this->apikey), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-
-                <strong>Company ID: </strong><br />
-                <input type="text" name="company_id" size="50" value="' . htmlentities(Tools::getValue('company_id', $this->company_id), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-
-                <input type="checkbox" name="use_sandbox" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('use_sandbox', $this->use_sandbox) ? ' checked="checked"' : '') . ' />
-                <strong>' . $this->l("Vystavovať doklady na Sandboxe") . '</strong><br /><br />
-
-                <strong>' . $this->l("Faktúru vytvárať pri") . ': <sup>*</sup></strong><br />
-                <select name="id_order_state_invoice">
-                    <option value="0"'.((0 == Tools::getValue('id_order_state_invoice', $this->id_order_state_invoice)) ? ' selected="selected"' : '').'>vytvorení objednávky</option>
-        ';
-
-                foreach ($states AS $state)
-                    $this->_html .= '<option value="'.$state['id_order_state'].'"'.(($state['id_order_state'] == Tools::getValue('id_order_state_invoice', $this->id_order_state_invoice)) ? ' selected="selected"' : '').'>zmene stavu objednávky na "'.stripslashes($state['name']).'"</option>';
-
-        $this->_html .= '
-                </select><br />
-                <br />
-
-                <input type="checkbox" name="set_invoice_paid" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('set_invoice_paid', $this->set_invoice_paid) ? ' checked="checked"' : '') . ' />
-                <strong>' . $this->l("Pri vytvorení faktúry ju nastaviť ako uhradenú") . '</strong>
-                <br />
-                <input type="checkbox" name="add_rounding" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('add_rounding', $this->add_rounding) ? ' checked="checked"' : '') . ' />
-                <strong>' . $this->l("Pridať centové / halierové vyrovnanie pre platbu v hotovosti") . '</strong><br /><br />
-
-                <strong>' . $this->l("Stav objednávky pre vytvorenie dobropisu") . ': <sup>*</sup></strong><br />
-                <select name="id_order_state_refund">
-        ';
-
-                foreach ($states AS $state)
-                    $this->_html .= '<option value="'.$state['id_order_state'].'"'.(($state['id_order_state'] == Tools::getValue('id_order_state_refund', $this->id_order_state_refund)) ? ' selected="selected"' : '').'>'.stripslashes($state['name']).'</option>';
-
-        $this->_html .= '
-                </select><br />
-                <br />
-
-                <strong>' . $this->l("Variabilný symbol na faktúre") . ': <sup>*</sup></strong><br />
-                <select name="variable_source">
-        ';
-
-        $this->_html .= '<option value="order"'.('order' == Tools::getValue('variable_source', $this->variable_source) ? ' selected="selected"' : '').'>'.$this->l("Číslo objednávky").'</option>';
-        $this->_html .= '<option value="invoice"'.('invoice' == Tools::getValue('variable_source', $this->variable_source) ? ' selected="selected"' : '').'>'.$this->l("Číslo faktúry").'</option>';
-
-        $this->_html .= '
-                </select><br />
-                <br />
-        <strong>ID číselníku pod ktorým chcete vystavovať doklady: </strong><br />
-                <input type="text" name="sequence_id" size="50" value="' . htmlentities(Tools::getValue('sequence_id', $this->sequence_id), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-         <strong>ID číselníku pod ktorým chcete vystavovať dobropisy: </strong><br />
-                <input type="text" name="cancel_sequence_id" size="50" value="' . htmlentities(Tools::getValue('cancel_sequence_id', $this->cancel_sequence_id), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-        <strong>ID loga ktoré chcete zobrazovať na doklade: </strong><br />
-                <input type="text" name="logo_id" size="50" value="' . htmlentities(Tools::getValue('logo_id', $this->logo_id), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-        <strong>ID bank. účtu, ktoré chcete zobrazovať na doklade: </strong><br />
-                <input type="text" name="bank_id" size="50" value="' . htmlentities(Tools::getValue('bank_id', $this->bank_id), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-        ';
-
-        $this->_html .= '       
-                <input type="checkbox" name="send_invoice" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('send_invoice', $this->send_invoice) ? ' checked="checked"' : '') . ' />
-                <strong>' . $this->l("Po vytvorení dokladu odoslať faktúru klientovi") . '</strong><br /><br />
-        ';
-        
-        $this->_html .= '       
-                <input type="checkbox" name="update_addressbook" value="1" style="margin-right: 5px;"' . (1 == Tools::getValue('update_addressbook', $this->update_addressbook) ? ' checked="checked"' : '') . ' />
-                <strong>' . $this->l("Po vytvorení dokladu zaktualizuje údaje klienta") . '</strong><br /><br />
-        ';
-
-        $this->_html .= '
-                </select>
-                <strong>' . $this->l("Vyberte jazyk v ktorom chcete doklady vystavovať") . ':</strong><br />
-                <select name="invoice_language">
-        ';
-
-        $this->_html .= '<option value="slo"'.('slo' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Slovenčina").'</option>';
-        $this->_html .= '<option value="cze"'.('cze' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Čeština").'</option>';
-        $this->_html .= '<option value="eng"'.('eng' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Angličtina").'</option>';
-        $this->_html .= '<option value="deu"'.('deu' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Nemčina").'</option>';
-        $this->_html .= '<option value="rus"'.('rus' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Ruština").'</option>';
-        $this->_html .= '<option value="ukr"'.('ukr' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Ukrajinčina").'</option>';
-        $this->_html .= '<option value="hun"'.('hun' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Maďarčina").'</option>';
-        $this->_html .= '<option value="pol"'.('pol' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Poľština").'</option>';
-        $this->_html .= '<option value="rom"'.('rom' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Rumunčina").'</option>';
-        $this->_html .= '<option value="hrv"'.('hrv' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Chorvátčina").'</option>';
-        $this->_html .= '<option value="slv"'.('slv' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Slovinčina").'</option>';
-        $this->_html .= '<option value="spa"'.('spa' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Španielčina").'</option>';
-        $this->_html .= '<option value="ita"'.('ita' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Taliančina").'</option>';
-        $this->_html .= '<option value="nld"'.('nld' == Tools::getValue('invoice_language', $this->invoice_language) ? ' selected="selected"' : '').'>'.$this->l("Holandčina").'</option>';
-        $this->_html .= '
-                </select><br /><br />';
-        
-        $this->_html .= '
-                </select>
-                <strong>' . $this->l("Typ dokladu, ktorý chcete vystavovať") . ': <sup>*</sup></strong><br />
-                <select name="invoice_type">
-        ';
-
-        $this->_html .= '<option value="regular"'.('regular' == Tools::getValue('invoice_type', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Ostrá faktúra").'</option>';
-        $this->_html .= '<option value="proforma"'.('proforma' == Tools::getValue('invoice_type', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Zálohová faktúra").'</option>';
-        $this->_html .= '<option value="order"'.('order' == Tools::getValue('invoice_type', $this->invoice_type) ? ' selected="selected"' : '').'>'.$this->l("Objednávka").'</option>';
-
-        $this->_html .= '
-                </select><br /><br />';
-
-        $this->_html .= '
-        <strong>Faktúru vystavil: </strong><br />
-                <input type="text" name="issued_by" size="50" value="' . htmlentities(Tools::getValue('issued_by', $this->issued_by), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-        <strong>Telefón: </strong><br />
-                <input type="text" name="issued_by_phone" size="50" value="' . htmlentities(Tools::getValue('issued_by_phone', $this->issued_by_phone), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-        <strong>Web: </strong><br />
-                <input type="text" name="issued_by_web" size="50" value="' . htmlentities(Tools::getValue('issued_by_web', $this->issued_by_web), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-        <strong>Email: </strong><br />
-                <input type="text" name="issued_by_email" size="50" value="' . htmlentities(Tools::getValue('issued_by_email', $this->issued_by_email), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-        ';
-
-        $this->_html .= '       
-                <input type="checkbox" name="by_square" value="1" style="margin-right: 5px;" ' . (1 == Tools::getValue('by_square', $this->by_square) ? ' checked="checked"' : '') . ' />
-                <strong>' . $this->l("Zobraziť Pay by square na faktúre") .     ': </strong><br />
-                <input type="checkbox" name="online_payment" value="1" style="margin-right: 5px;" ' . (1 == Tools::getValue('online_payment', $this->online_payment) ? ' checked="checked"' : '') . ' />
-                <strong>' . $this->l("Zobraziť Online platby na faktúre") . ': </strong><br />
-                <input type="checkbox" name="paypal" value="1" style="margin-right: 5px;" ' . (1 == Tools::getValue('paypal', $this->paypal) ? ' checked="checked"' : '') . ' />
-                <strong>' . $this->l("Zobraziť Paypal na faktúre") . ': </strong> <br /><br />
-        ';
-
-        $this->_html .= '
-            <strong>Payment callback. URL, <br /> ktorá sa automaticky zavolá po pridaní úhrady k faktúre </strong><br />
-            <input type="text" name="callback_payment" size="50" value="' . htmlentities(Tools::getValue('callback_payment', $this->callback_payment), ENT_COMPAT, 'UTF-8') . '" /><br />';
-
-        $this->_html .= '<br /><strong>' . $this->l("Účtovníctvo") . ': </strong><br />';
-        $this->_html .= '
-                <br />
-        <strong> Syntetický účet pre produkty: </strong><br />
-                <input type="text" name="product_syntetic" size="50" value="' . htmlentities(Tools::getValue('product_syntetic', $this->product_syntetic), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-         <strong>Analytický účet pre produkty: </strong><br />
-                <input type="text" name="product_analytic" size="50" value="' . htmlentities(Tools::getValue('product_analytic', $this->product_analytic), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-        <strong>Syntetický účet pre dopravu: </strong><br />
-                <input type="text" name="carrier_syntetic" size="50" value="' . htmlentities(Tools::getValue('carrier_syntetic', $this->carrier_syntetic), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-        <strong>Analytický účet pre dopravu: </strong><br />
-                <input type="text" name="carrier_analytic" size="50" value="' . htmlentities(Tools::getValue('carrier_analytic', $this->carrier_analytic), ENT_COMPAT, 'UTF-8') . '" /><br />
-                <br />
-        ';
-
-        $this->_html .= '        <input type="submit" name="btnSubmit" value="'.$this->l('Uložiť').'" class="button" />
-            </form>
-            </div>   
-        ';
+        $this->_html .= (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\ModuleConfigurationFormRenderer())
+            ->render(
+                (string) ($_SERVER['REQUEST_URI'] ?? ''),
+                $values,
+                OrderState::getOrderStates((int) $cookie->id_lang),
+                $labels,
+            );
     }
 
 
