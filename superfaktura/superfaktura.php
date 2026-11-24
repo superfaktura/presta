@@ -412,52 +412,44 @@ class SuperFaktura extends Module
 
     private function _request($url, $data = "")
     {
-        $c = curl_init();
-        if(!empty($data)){
-            $tmp_data = json_decode($data['data'], true);
-            $tmp_data['apptitle'] = $_SERVER['SERVER_NAME'];
-            $tmp_data['module'] = 'PrestaShop: '._PS_VERSION_.' module: '.$this->version.' ';
-            $data['data'] = json_encode($tmp_data);
+        require_once __DIR__ . '/autoload.php';
+
+        $baseUrl = $this->getSfUrl('');
+
+        if (!is_string($url) || !str_starts_with($url, $baseUrl . '/')) {
+            return false;
         }
 
-        $options = array(
-            CURLOPT_URL            => $url,
-            CURLOPT_REFERER        => $url,
-            CURLOPT_HEADER         => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $data,
-            CURLOPT_HTTPHEADER     => array("Authorization: " . self::API_AUTH_KEYWORD . " email=" . $this->email . "&apikey=" . $this->apikey . "&company_id=" . $this->company_id),
-            CURLOPT_ENCODING       => '',
-            CURLOPT_SSL_VERIFYHOST => 0,
-            CURLOPT_SSL_VERIFYPEER => 0,
-            CURLOPT_TIMEOUT        => 10,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_RETURNTRANSFER => true,
+        $payloadJson = null;
+
+        if ('' !== $data && [] !== $data) {
+            if (!is_array($data) || !isset($data['data']) || !is_string($data['data'])) {
+                return false;
+            }
+
+            $payloadJson = $data['data'];
+        }
+
+        try {
+            $client = (new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\SuperFakturaClientFactory())->create(
+                email: (string) $this->email,
+                apiKey: (string) $this->apikey,
+                companyId: (string) $this->company_id,
+                moduleName: 'PrestaShop ' . $this->version,
+                useSandbox: 1 == $this->use_sandbox,
+            );
+        } catch (\InvalidArgumentException) {
+            return false;
+        }
+
+        $request = new \SuperFaktura\PrestaShop\Infrastructure\SuperFaktura\LegacyApiRequest(
+            client: $client,
+            parser: new \SuperFaktura\PrestaShop\Infrastructure\Api\Service\JsonParser(),
+            applicationTitle: (string) ($_SERVER['SERVER_NAME'] ?? ''),
+            moduleIdentification: 'PrestaShop: ' . _PS_VERSION_ . ' module: ' . $this->version . ' ',
         );
 
-        curl_setopt_array($c, $options);
-
-        $result = curl_exec($c);
-
-        $http_code = curl_getinfo($c, CURLINFO_HTTP_CODE);
-
-        curl_close($c);
-
-        if ((false === $result) || (200 != $http_code))
-        {
-            return false;
-        }
-
-
-        if (false === strpos($result, "\r\n\r\n"))
-        {
-            return false;
-        }
-
-        $result = explode("\r\n\r\n", $result);
-
-
-        return $result[count($result) - 1];
+        return $request->post(substr($url, strlen($baseUrl)), $payloadJson);
     }
 
     private function createPeppolInvoiceGateway(): \SuperFaktura\PrestaShop\Application\Contract\PeppolInvoiceGatewayInterface
