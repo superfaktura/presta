@@ -469,438 +469,77 @@ class SuperFaktura extends Module
 
     private function _createInvoice($order, $cart)
     {
+        require_once __DIR__ . '/autoload.php';
 
-        if (Shop::isFeatureActive())
+        if (Shop::isFeatureActive()) {
             Shop::setContext(Shop::CONTEXT_SHOP, $order->id_shop);
+        }
 
-        $data = array(
-            'InvoiceItem' => array()
+        $options = new \SuperFaktura\PrestaShop\Application\Dto\InvoiceCreationOptions(
+            invoiceType: (string) $this->invoice_type,
+            useOrderIdAsVariable: 'order' === $this->variable_source,
+            alreadyPaid: 1 == $this->set_invoice_paid,
+            updateAddressBook: (bool) $this->update_addressbook,
+            addCashOnDeliveryRounding: (bool) $this->add_rounding,
+            language: (string) $this->invoice_language,
+            sequenceId: $this->sequence_id ?: '',
+            issuedBy: (string) ($this->issued_by ?: ''),
+            issuedByPhone: (string) ($this->issued_by_phone ?: ''),
+            issuedByWeb: (string) ($this->issued_by_web ?: ''),
+            issuedByEmail: (string) ($this->issued_by_email ?: ''),
+            logoId: $this->logo_id ?: '',
+            bankId: $this->bank_id ?: null,
+            productSyntheticAccount: $this->product_syntetic ?: '',
+            productAnalyticAccount: $this->product_analytic ?: '',
+            carrierSyntheticAccount: $this->carrier_syntetic ?: '',
+            carrierAnalyticAccount: $this->carrier_analytic ?: '',
+            bySquare: $this->by_square,
+            onlinePayment: $this->online_payment,
+            paypal: $this->paypal,
+            callbackPayment: $this->callback_payment,
         );
 
-        $customer         = new Customer($cart->id_customer);
-        $address          = new Address($cart->id_address_invoice);
-        $delivery_address = new Address($cart->id_address_delivery);
-        $carrier          = new Carrier($order->id_carrier);
-        $currency         = new Currency($order->id_currency);
-        $products = $order->getCartProducts();
-
-
-
-
-        $name = $address->company;
-        if (empty($name) && (("" != $address->firstname) || ("" != $address->lastname)))
-        {
-            $name .= ("" != $name ? ", " : "") . $address->firstname;
-            $name .= ("" != $address->firstname ? " " : "") . $address->lastname;
-        }
-
-        $delivery_name = $delivery_address->company;
-        if (empty($delivery_name) && (("" != $delivery_address->firstname) || ("" != $delivery_address->lastname)))
-        {
-            $delivery_name .= ("" != $delivery_name ? ", " : "") . $delivery_address->firstname;
-            $delivery_name .= ("" != $delivery_address->firstname ? " " : "") . $delivery_address->lastname;
-        }
-
-        $phone = ("" != $address->phone_mobile ? $address->phone_mobile : $address->phone);
-
-        $dic    = "";
-        $ic_dph = "";
-        $start  = isset($address->vat_number) ? substr($address->vat_number, 0, 2) : '';
-
-        if(!empty($address->vat_number)){
-            if(!is_numeric($start)){
-                $ic_dph = $address->vat_number;
-                $dic    = substr($address->vat_number, 2);
-            } else {
-                $dic = $address->vat_number;
-            }
-        }
-
-        if(strlen($ic_dph) < 5){
-            $ic_dph = "";
-        }
-
-        //prekladanie ID krajin v preste do SF
-        $countries_translate = array(
-            231 => 1,
-            230 => 2,
-            38 => 3,
-            39 => 4,
-            40 => 5,
-            41 => 6,
-            42 => 7,
-            232 => 8,
-            43 => 9,
-            44 => 10,
-            45 => 11,
-            46 => 12,
-            24 => 13,
-            2 => 14,
-            47 => 15,
-            48 => 16,
-            49 => 17,
-            50 => 18,
-            51 => 19,
-            52 => 20,
-            3 => 21,
-            53 => 22,
-            54 => 23,
-            55 => 24,
-            56 => 25,
-            34 => 26,
-            233 => 27,
-            57 => 28,
-            234 => 29,
-            58 => 30,
-            235 => 31,
-            59 => 32,
-            236 => 33,
-            60 => 34,
-            62 => 35,
-            63 => 36,
-            64 => 37,
-            4 => 38,
-            65 => 39,
-            237 => 40,
-            66 => 41,
-            67 => 42,
-            68 => 43,
-            5 => 44,
-            238 => 45,
-            239 => 46,
-            69 => 47,
-            70 => 48,
-            72 => 49,
-            71 => 50,
-            240 => 51,
-            73 => 52,
-            32 => 53,
-            74 => 54,
-            75 => 55,
-            76 => 56,
-            16 => 57,
-            20 => 58,
-            77 => 59,
-            78 => 60,
-            79 => 61,
-            80 => 62,
-            81 => 63,
-            82 => 64,
-            83 => 65,
-            84 => 66,
-            85 => 67,
-            86 => 68,
-            87 => 69,
-            88 => 70,
-            89 => 71,
-            90 => 72,
-            7 => 73,
-            8 => 74,
-            241 => 76,
-            242 => 77,
-            243 => 78,
-            91 => 79,
-            92 => 80,
-            93 => 81,
-            1 => 82,
-            94 => 83,
-            97 => 84,
-            9 => 85,
-            96 => 86,
-            95 => 87,
-            98 => 88,
-            99 => 89,
-            100 => 90,
-            102 => 91,
-            103 => 92,
-            104 => 93,
-            105 => 94,
-            106 => 95,
-            108 => 97,
-            22 => 98,
-            143 => 99,
-            109 => 100,
-            110 => 101,
-            111 => 102,
-            112 => 103,
-            113 => 104,
-            26 => 105,
-            29 => 106,
-            10 => 107,
-            115 => 108,
-            11 => 109,
-            117 => 110,
-            118 => 111,
-            119 => 112,
-            120 => 113,
-            121 => 114,
-            122 => 116,
-            123 => 117,
-            124 => 118,
-            125 => 119,
-            126 => 120,
-            127 => 121,
-            128 => 122,
-            129 => 123,
-            130 => 124,
-            131 => 125,
-            12 => 126,
-            132 => 127,
-            133 => 128,
-            134 => 129,
-            135 => 130,
-            136 => 131,
-            137 => 132,
-            138 => 133,
-            139 => 134,
-            140 => 135,
-            141 => 136,
-            142 => 137,
-            35 => 138,
-            144 => 139,
-            145 => 140,
-            146 => 141,
-            147 => 142,
-            148 => 143,
-            149 => 144,
-            151 => 145,
-            152 => 146,
-            153 => 147,
-            61 => 148,
-            154 => 149,
-            154 => 150,
-            156 => 151,
-            13 => 152,
-            157 => 153,
-            158 => 154,
-            27 => 155,
-            159 => 156,
-            160 => 157,
-            31 => 158,
-            161 => 159,
-            162 => 160,
-            163 => 161,
-            23 => 162,
-            164 => 163,
-            165 => 164,
-            166 => 165,
-            168 => 166,
-            169 => 167,
-            170 => 168,
-            171 => 169,
-            172 => 170,
-            173 => 171,
-            14 => 172,
-            15 => 173,
-            174 => 174,
-            175 => 175,
-            176 => 176,
-            36 => 177,
-            177 => 178,
-            178 => 179,
-            180 => 180,
-            181 => 181,
-            184 => 182,
-            185 => 183,
-            186 => 184,
-            187 => 185,
-            188 => 186,
-            189 => 187,
-            191 => 188,
-            192 => 189,
-            25 => 190,
-            37 => 191,
-            193 => 192,
-            194 => 193,
-            195 => 194,
-            30 => 195,
-            196 => 196,
-            6 => 197,
-            197 => 198,
-            183 => 200,
-            198 => 201,
-            199 => 202,
-            200 => 203,
-            201 => 204,
-            18 => 205,
-            19 => 206,
-            202 => 207,
-            203 => 208,
-            204 => 209,
-            205 => 210,
-            206 => 211,
-            33 => 212,
-            207 => 213,
-            208 => 214,
-            209 => 215,
-            210 => 216,
-            211 => 217,
-            212 => 218,
-            213 => 219,
-            214 => 220,
-            215 => 221,
-            216 => 222,
-            217 => 223,
-            17 => 224,
-            21 => 225,
-            218 => 227,
-            219 => 228,
-            220 => 229,
-            221 => 230,
-            222 => 231,
-            223 => 232,
-            224 => 233,
-            225 => 234,
-            226 => 235,
-            227 => 236,
-            190 => 237,
-            238 => 238,
-            239 => 239,
-            150 => 240,
-            184 => 241,
-            116 => 243,
-            101 => 244,
+        $builder = new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\InvoicePayloadBuilder(
+            new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\InvoiceClientMapper(
+                new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\LegacyCountryIdMapper(),
+            ),
+            new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PaymentMethodMapper(),
         );
 
-
-        $data['Client'] = array(
-            'ico'                 => isset($address->dni) ? $address->dni : '',
-            'name'                => $name,
-            'address'             => $address->address1 . ("" != $address->address2 ? ", " : "") . $address->address2,
-            'city'                => $address->city,
-            'zip'                 => $address->postcode,
-            'country'             => $address->country,
-            'country_id'          => $countries_translate[$address->id_country],
-            'delivery_name'       => $delivery_name,
-            'delivery_address'    => $delivery_address->address1 . ("" != $delivery_address->address2 ? ", " : "") . $delivery_address->address2,
-            'delivery_city'       => $delivery_address->city,
-            'delivery_zip'        => $delivery_address->postcode,
-            'delivery_country'    => $delivery_address->country,
-            'delivery_country_id' => $countries_translate[$delivery_address->id_country],
-            'phone'               => ("" != $address->phone_mobile ? $address->phone_mobile : $address->phone),
-            'email'               => $customer->email,
-            'ic_dph'              => $ic_dph,
-            'dic'                 => $dic,
-            'update_addressbook'  => !empty($this->update_addressbook),
-        );
-
-        $data['Invoice'] = array(
-            'import_type'       => "prestashop",
-            'type'              => $this->invoice_type,
-            'import_id'         => $order->id,
-            'variable'          => ($this->variable_source == 'order') ? $order->id : null,
-            'order_no'          => $order->id,
-            'already_paid'      => (1 == $this->set_invoice_paid),
-            'delivery_type'     => isset($carrier->name) ? $carrier->name : '',
-            'payment_type'      => isset($order->payment) ? ($order->payment == 'Bank wire') ? 'transfer' : $order->payment : '',
-            'rounding'          => 'item_ext', // defultne nastavime na maloobchod predchadzame problemom so zaokruhlovanim
-            'sequence_id'       => (!empty($this->sequence_id)) ? $this->sequence_id : '',
-            'issued_by'         => (!empty($this->issued_by)) ? $this->issued_by : '',
-            'issued_by_phone'   => (!empty($this->issued_by_phone)) ? $this->issued_by_phone : '',
-            'issued_by_web'     => (!empty($this->issued_by_web)) ? $this->issued_by_web : '',
-            'issued_by_email'   => (!empty($this->issued_by_email)) ? $this->issued_by_email : '',
-            'discount_total'    => (isset($order->total_discounts) && $order->total_discounts > 0) ? $order->total_discounts : null,
-            'logo_id'           => (!empty($this->logo_id)) ? $this->logo_id : '',
-
-        );
-
-        if (!empty($this->bank_id)) {
-            $data['Invoice']['bank_accounts'] = array(
-                array(
-                    'id' => $this->bank_id,
-                )
-            );
-        }
-
-        if (!empty($this->add_rounding) && $this->isCodPayment($order->payment)) {
-            $data['Invoice']['add_rounding_item'] = true;
-        }
-
-        $data['InvoiceSetting']['settings'] = json_encode(array(
-            'language'         => $this->invoice_language,
-            'signature'        => true,
-            'payment_info'     => true,
-            'bysquare'         => $this->by_square,
-            'online_payment'   => $this->online_payment,
-            'paypal'           => $this->paypal,
-            'callback_payment' => $this->callback_payment,
-        ));
-
-        if (isset($currency->iso_code))
-            $data['Invoice']['invoice_currency'] = $currency->iso_code;
-
-        //invoice items
-        foreach ($products as $product)
-        {
-            $sku = $product['product_reference'];
-            if(empty($sku)){ $sku = $product['product_upc']; }
-            if(empty($sku)){ $sku = $product['product_ean13']; }
-            if(empty($sku)){ $sku = null; }
-
-            $data['InvoiceItem'][] = array(
-                'name'        => $product['product_name'],
-                'description' => trim((isset($product['attributes_small']) ? strip_tags($product['attributes_small']) : "").PHP_EOL.$sku),
-                'quantity'    => $product['product_quantity'],
-                'unit'        => 'ks',
-                'unit_price'  => $product['unit_price_tax_excl'],
-                'tax'         => $product['tax_rate'],
-                'sku'         => $sku,
-            );
-
-            if (!empty($this->product_analytic) || !empty($this->product_syntetic)) {
-                end($data['InvoiceItem']); 
-                $data['InvoiceItem'][key($data['InvoiceItem'])]['AccountingDetail'] = array(
-                    'analytics_account' => (!empty($this->product_analytic)) ? $this->product_analytic : '',
-                    'synthetic_account' => (!empty($this->product_syntetic)) ? $this->product_syntetic : '',
-                );
-            }
-        }
-
-        //shipping
-        if (isset($order->total_shipping) && (0 < $order->total_shipping))
-        {
-            $shipping_tax = isset($order->carrier_tax_rate) ? $order->carrier_tax_rate : 0;
-            $shipping     = $order->total_shipping / (1 + ($shipping_tax / 100));
-
-            $data['InvoiceItem'][] = array(
-                'name'        => $carrier->name,
-                'quantity'    => 1,
-                'unit'        => 'ks',
-                'unit_price'  => $shipping,
-                'tax'         => $shipping_tax,
-            );
-
-            if (!empty($this->carrier_syntetic) || !empty($this->carrier_analytic)) {
-                end($data['InvoiceItem']); 
-                $data['InvoiceItem'][key($data['InvoiceItem'])]['AccountingDetail'] = array(
-                    'analytics_account' => (!empty($this->carrier_analytic)) ? $this->carrier_analytic : '',
-                    'synthetic_account' => (!empty($this->carrier_syntetic)) ? $this->carrier_syntetic : '',
-                );
-            }
-        }
-
-        $response = $this->_request($this->getSfUrl(self::SF_URL_CREATE_INVOICE), array('data' => json_encode($data)));
-        $response = json_decode($response);
-        
-        if (false == $response)
-        {
-             return;
-        }      
-        
-        //poslat fakturu emailom 
-        if(isset($response->error) && $response->error == 0 && $this->send_invoice == 1){
-            $request_data['Email'] =array(
-                'invoice_id' => $response->data->Invoice->id,
-                'to'  => $response->data->Client->email,
-            );
-
-            $send = $this->_request($this->getSfUrl(self::SF_URL_SEND_INVOICE), array('data' => json_encode($request_data)));
-
-        }
-
-        if ((isset($response->error) && (0 != $response->error)) || ! isset($response->data->Invoice->variable))
-        {
+        try {
+            $data = $builder->build($order, $cart, $options);
+            $payloadJson = json_encode($data, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
             return;
+        }
+
+        $responseBody = $this->_request(
+            $this->getSfUrl(self::SF_URL_CREATE_INVOICE),
+            ['data' => $payloadJson],
+        );
+
+        if (false === $responseBody) {
+            return;
+        }
+
+        $response = json_decode($responseBody);
+
+        if (!$response) {
+            return;
+        }
+
+        if (isset($response->error) && 0 == $response->error && 1 == $this->send_invoice) {
+            $requestData = [
+                'Email' => [
+                    'invoice_id' => $response->data->Invoice->id,
+                    'to' => $response->data->Client->email,
+                ],
+            ];
+
+            $this->_request(
+                $this->getSfUrl(self::SF_URL_SEND_INVOICE),
+                ['data' => json_encode($requestData)],
+            );
         }
     }
 
@@ -979,9 +618,9 @@ class SuperFaktura extends Module
      * */
     public function isCodPayment(string $payment = ''): bool
     {
-        return (
-            $payment === 'Cash on delivery'
-                || strpos(strtolower($payment), 'dobier') !== false
-        );
+        require_once __DIR__ . '/autoload.php';
+
+        return (new \SuperFaktura\PrestaShop\Infrastructure\PrestaShop\PaymentMethodMapper())
+            ->isCashOnDelivery($payment);
     }
 }
