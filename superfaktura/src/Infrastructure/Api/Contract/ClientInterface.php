@@ -11,4 +11,7 @@ interface ClientInterface
     public function get(string $path): HttpResponse;
 
     public function postJson(string $path, string $body): HttpResponse;
+
+    /** @param array<string, string> $fields */
+    public function postForm(string $path, array $fields): HttpResponse;
 }

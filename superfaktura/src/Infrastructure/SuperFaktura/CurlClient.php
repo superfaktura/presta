@@ -29,18 +29,26 @@ final readonly class CurlClient implements ClientInterface
 
     public function get(string $path): HttpResponse
     {
-        return $this->request('GET', $path, null);
+        return $this->request('GET', $path);
     }
 
     public function postJson(string $path, string $body): HttpResponse
     {
-        return $this->request('POST', $path, $body);
+        return $this->request('POST', $path, jsonBody: $body);
     }
 
+    /** @param array<string, string> $fields */
+    public function postForm(string $path, array $fields): HttpResponse
+    {
+        return $this->request('POST', $path, formFields: $fields);
+    }
+
+    /** @param array<string, string>|null $formFields */
     private function request(
         string $method,
         string $path,
-        ?string $body,
+        ?string $jsonBody = null,
+        ?array $formFields = null,
     ): HttpResponse {
         $headers = [
             'Authorization: ' . $this->authorizationHeader,
@@ -51,33 +59,51 @@ final readonly class CurlClient implements ClientInterface
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_ENCODING => '',
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_CONNECTTIMEOUT => 5,
             CURLOPT_TIMEOUT => 10,
         ];
 
-        if (null !== $body) {
+        if (null !== $jsonBody) {
             $headers[] = 'Content-Type: application/json';
-            $options[CURLOPT_POSTFIELDS] = $body;
+            $options[CURLOPT_POSTFIELDS] = $jsonBody;
+        } elseif (null !== $formFields) {
+            $options[CURLOPT_POSTFIELDS] = [] === $formFields ? '' : $formFields;
         }
 
         $options[CURLOPT_HTTPHEADER] = $headers;
         $handle = curl_init($this->baseUrl . $path);
 
-        if (false === $handle || false === curl_setopt_array($handle, $options)) {
-            throw new RuntimeException('Could not configure the SuperFaktura request.');
+        if (false === $handle) {
+            throw new RuntimeException(
+                'Could not initialize the SuperFaktura request.',
+            );
         }
 
-        $responseBody = curl_exec($handle);
+        try {
+            if (false === curl_setopt_array($handle, $options)) {
+                throw new RuntimeException(
+                    'Could not configure the SuperFaktura request.',
+                );
+            }
 
-        if (!is_string($responseBody)) {
-            throw new SuperFakturaTransportException('SuperFaktura request failed.', curl_errno($handle));
+            $responseBody = curl_exec($handle);
+
+            if (!is_string($responseBody)) {
+                throw new SuperFakturaTransportException(
+                    'SuperFaktura request failed.',
+                    curl_errno($handle),
+                );
+            }
+
+            return new HttpResponse(
+                statusCode: (int) curl_getinfo($handle, CURLINFO_HTTP_CODE),
+                body: $responseBody,
+            );
+        } finally {
+            curl_close($handle);
         }
-
-        return new HttpResponse(
-            statusCode: (int) curl_getinfo($handle, CURLINFO_HTTP_CODE),
-            body: $responseBody,
-        );
     }
 }
