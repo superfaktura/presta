@@ -44,6 +44,11 @@ final class ModuleConfigurationFields
         'update_addressbook' => ['key' => 'SUPERFAKTURA_UPDATE_ADDRESSBOOK', 'default' => '', 'checkbox' => true],
         'use_sandbox' => ['key' => 'SUPERFAKTURA_USE_SANDBOX', 'default' => '', 'checkbox' => true],
         'add_rounding' => ['key' => 'SUPERFAKTURA_ADD_ROUNDING', 'default' => '', 'checkbox' => true],
+        'send_peppol' => [
+            'key' => 'SUPERFAKTURA_SEND_PEPPOL',
+            'default' => 0,
+            'checkbox' => true,
+        ],
     ];
 
     /** @return array<string, Field> */

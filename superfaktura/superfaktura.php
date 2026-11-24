@@ -41,7 +41,8 @@ class SuperFaktura extends Module
         $update_addressbook,
         $use_sandbox,
         $add_rounding,
-        $set_invoice_paid;
+        $set_invoice_paid,
+        $send_peppol;
 
     const API_AUTH_KEYWORD          = 'SFAPI';
     const SF_URL_CREATE_INVOICE     = '/invoices/create';
@@ -247,6 +248,7 @@ class SuperFaktura extends Module
             'variable_order' => $this->l('Číslo objednávky'),
             'variable_invoice' => $this->l('Číslo faktúry'),
             'send_invoice' => $this->l('Po vytvorení dokladu odoslať faktúru klientovi'),
+            'send_peppol' => $this->l('Po vytvorení odoslať ostrú faktúru cez Peppol'),
             'update_addressbook' => $this->l('Po vytvorení dokladu zaktualizuje údaje klienta'),
             'invoice_language' => $this->l('Vyberte jazyk v ktorom chcete doklady vystavovať'),
             'language_slo' => $this->l('Slovenčina'),

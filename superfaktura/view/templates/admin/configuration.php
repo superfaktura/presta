@@ -97,6 +97,9 @@ $languages = [
         <input type="checkbox" name="send_invoice" value="1" style="margin-right: 5px;"<?= $checked('send_invoice') ?> />
         <strong><?= $label('send_invoice') ?></strong><br /><br />
 
+		<input type="checkbox" name="send_peppol" value="1" style="margin-right: 5px;"<?= $checked('send_peppol') ?> />
+		<strong><?= $label('send_peppol') ?></strong><br /><br />
+
         <input type="checkbox" name="update_addressbook" value="1" style="margin-right: 5px;"<?= $checked('update_addressbook') ?> />
         <strong><?= $label('update_addressbook') ?></strong><br /><br />
 
